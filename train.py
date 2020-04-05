@@ -56,7 +56,7 @@ def parse_args(bypassArgs=None):
                         help='Auxiliary loss')
     parser.add_argument('--aux-weight', type=float, default=0.4,
                         help='auxiliary loss weight')
-    parser.add_argument('--batch-size', type=int, default=10, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=2, metavar='N',
                         help='input batch size for training (default: 4)')
     parser.add_argument('--start_epoch', type=int, default=0,
                         metavar='N', help='start epochs (default:0)')
@@ -75,7 +75,7 @@ def parse_args(bypassArgs=None):
     parser.add_argument('--warmup-method', type=str, default='linear',
                         help='method of warmup')
     # cuda setting
-    parser.add_argument('--no-cuda', action='store_true', default=False,
+    parser.add_argument('--no-cuda', action='store_true', default=True,
                         help='disables CUDA training')
     parser.add_argument('--local_rank', type=int, default=0)
     # checkpoint and log
@@ -113,7 +113,7 @@ class Trainer(object):
         # image transform
         input_transform = transforms.Compose([
             transforms.ToTensor(),
-            # transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+            transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
         ])
         # dataset and dataloader
         # data_kwargs = {'transform': input_transform, 'base_size': args.base_size, 'crop_size': args.crop_size}

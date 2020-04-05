@@ -32,7 +32,8 @@ class CULaneDataset(Dataset):
 
         if self.transform is not None:
             img_rgb = self.transform(img_rgb)
-            segImage = self.transform(segImage)
+            t=transforms.ToTensor()
+            segImage = t(segImage)
         return img_rgb, segImage
 
     def __len__(self):
