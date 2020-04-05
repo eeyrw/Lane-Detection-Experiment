@@ -42,6 +42,8 @@ def parse_args(bypassArgs=None):
                         help='model name (default: mobilenet)')
     parser.add_argument('--dataset', type=str, default='culane',
                         help='dataset name (default: culane)')
+    parser.add_argument('--rootDir', type=str, default=r'E:\CULane',
+                        help='root directory (default: E:\\CULane)')                    
     parser.add_argument('--base-size', type=int, default=1024,
                         help='base image size')
     parser.add_argument('--crop-size', type=int, default=768,
@@ -114,8 +116,8 @@ class Trainer(object):
         ])
         # dataset and dataloader
         # data_kwargs = {'transform': input_transform, 'base_size': args.base_size, 'crop_size': args.crop_size}
-        data_kwargs = {'transform': input_transform}
-        trainset = get_segmentation_dataset(args.dataset, split='train', mode='train', rootDir=r'E:\CULane',**data_kwargs)
+        data_kwargs = {'transform': input_transform,'rootDir':args.rootDir}
+        trainset = get_segmentation_dataset(args.dataset, split='train', mode='train',**data_kwargs)
         args.iters_per_epoch = len(trainset) // (args.num_gpus * args.batch_size)
         args.max_iters = args.epochs * args.iters_per_epoch
 
@@ -127,7 +129,7 @@ class Trainer(object):
                                             pin_memory=True)
 
         if not args.skip_val:
-            valset = get_segmentation_dataset(args.dataset, split='val', mode='val',rootDir=r'E:\CULane', **data_kwargs)
+            valset = get_segmentation_dataset(args.dataset, split='val', mode='val', **data_kwargs)
             val_sampler = make_data_sampler(valset, False, args.distributed)
             val_batch_sampler = make_batch_data_sampler(val_sampler, args.batch_size)
             self.val_loader = data.DataLoader(dataset=valset,
