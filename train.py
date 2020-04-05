@@ -22,6 +22,7 @@ import argparse
 import torch.utils.data as data
 import torch.backends.cudnn as cudnn
 import time
+import os
 
 # # 定义 transforms
 # transformations = transforms.Compose([transforms.ToTensor()])
@@ -275,6 +276,8 @@ def save_checkpoint(model, args, is_best=False):
 
 
 if __name__ == '__main__':
+
+    print(os.getcwd())
     args = parse_args()
 
     # reference maskrcnn-benchmark
