@@ -16,7 +16,7 @@ class CULaneDataset(Dataset):
         self.transform = transform
         self.split = split
 
-        self.trainIndexFilePath = os.path.join(rootDir, r'list\train_gt.txt')
+        self.trainIndexFilePath = os.path.join(rootDir, r'list/train_gt.txt')
         self.trainFilePairList = []
 
         with open(self.trainIndexFilePath, 'r') as f:
