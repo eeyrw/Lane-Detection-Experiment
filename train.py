@@ -75,7 +75,7 @@ def parse_args(bypassArgs=None):
     parser.add_argument('--warmup-method', type=str, default='linear',
                         help='method of warmup')
     # cuda setting
-    parser.add_argument('--no-cuda', action='store_true', default=False,
+    parser.add_argument('--no-cuda', action='store_true', default=True,
                         help='disables CUDA training')
     parser.add_argument('--local_rank', type=int, default=0)
     # checkpoint and log
