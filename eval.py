@@ -157,7 +157,6 @@ class Evaler(object):
             args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
 
-
         if args.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
                                                              device_ids=[
@@ -177,23 +176,28 @@ class Evaler(object):
             model = self.model
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
-        for i, (image, target,rawSeg) in enumerate(self.val_loader):
+        for i, (image, target) in enumerate(self.val_loader):
             image = image.to(self.device)
             target = target.to(self.device)
 
             with torch.no_grad():
                 outputs = model(image)
-                aaa=outputs[0][0][1]
-                bbb=outputs[0][0][0]
-                plt.subplot(311)
-                plt.imshow(aaa, cmap=plt.cm.hot, vmin=torch.min(aaa), vmax=torch.max(aaa))
-                plt.subplot(312)
-                plt.imshow(bbb, cmap=plt.cm.hot, vmin=torch.min(bbb), vmax=torch.max(bbb))
-                plt.subplot(313)
-                plt.imshow(target[0].numpy(),cmap=plt.cm.hot, vmin=0, vmax=2)
+                aaa = outputs[0][0][1]
+                bbb = outputs[0][0][0]
+                plt.subplot(411)
+                plt.imshow(aaa, cmap=plt.cm.hot, vmin=torch.min(
+                    aaa), vmax=torch.max(aaa))
                 plt.colorbar()
+                plt.subplot(412)
+                plt.imshow(bbb, cmap=plt.cm.hot, vmin=torch.min(
+                    bbb), vmax=torch.max(bbb))
+                plt.colorbar()
+                plt.subplot(413)
+                plt.imshow(target[0].numpy(), cmap=plt.cm.hot, vmin=0, vmax=2)
+                plt.colorbar()
+                plt.subplot(414)
+                plt.imshow(image[0].permute(1,2,0))
                 plt.show()
-
 
 
 
