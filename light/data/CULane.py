@@ -41,7 +41,7 @@ class CULaneDataset(Dataset):
             segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
             # segImageBackground= t(segImageBackground)
             # segImages=t(np.stack((segImage,segImageBackground),axis=2))
-        return img_rgb, segImage,rawSegImage
+        return img_rgb, segImage
 
     def __len__(self):
         return len(self.filePairList)
