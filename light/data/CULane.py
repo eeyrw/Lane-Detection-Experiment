@@ -16,17 +16,23 @@ class CULaneDataset(Dataset):
         self.transform = transform
         self.split = split
 
+        self.filePairList = []
         self.trainIndexFilePath = os.path.join(rootDir, r'list/train_gt.txt')
-        self.trainFilePairList = []
+        self.valIndexFilePath = os.path.join(rootDir, r'list/val_gt.txt')
 
-        with open(self.trainIndexFilePath, 'r') as f:
+        if split=='train':
+            self.indexFilePath=self.trainIndexFilePath
+        else:
+            self.indexFilePath=self.valIndexFilePath
+
+        with open(self.indexFilePath, 'r') as f:
             for line in f.readlines():
                 imagePath, segImagePath, lane0, lane1, lane2, lane4 = line.split()
-                self.trainFilePairList.append(
+                self.filePairList.append(
                     (os.path.join(rootDir, imagePath[1:]), os.path.join(rootDir, segImagePath[1:]), lane0, lane1, lane2, lane4))
 
     def __getitem__(self, idx):
-        imageFile, segFile, _, _, _, _ = self.trainFilePairList[idx]
+        imageFile, segFile, _, _, _, _ = self.filePairList[idx]
         img_rgb = Image.open(imageFile).convert('RGB')
         segImage = np.clip(cv2.imread(segFile, cv2.IMREAD_UNCHANGED), 0, 1)
         # segImageBackground = np.ones_like(segImage)-segImage
@@ -39,7 +45,7 @@ class CULaneDataset(Dataset):
         return img_rgb, segImage
 
     def __len__(self):
-        return len(self.trainFilePairList)
+        return len(self.filePairList)
 
     @property
     def num_class(self):
