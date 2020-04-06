@@ -129,7 +129,7 @@ class Evaler(object):
         data_kwargs = {'transform': input_transform, 'rootDir': args.rootDir}
         if not args.skip_val:
             valset = get_segmentation_dataset(
-                args.dataset, split='train', mode='val', **data_kwargs)
+                args.dataset, split='val', mode='val', **data_kwargs)
             val_sampler = make_data_sampler(valset, False, args.distributed)
             val_batch_sampler = make_batch_data_sampler(
                 val_sampler, args.batch_size)
