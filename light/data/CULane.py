@@ -34,15 +34,14 @@ class CULaneDataset(Dataset):
     def __getitem__(self, idx):
         imageFile, segFile, _, _, _, _ = self.filePairList[idx]
         img_rgb = Image.open(imageFile).convert('RGB')
-        segImage = np.clip(cv2.imread(segFile, cv2.IMREAD_UNCHANGED), 0, 1)
+        rawSegImage = np.clip(cv2.imread(segFile, cv2.IMREAD_UNCHANGED), 0, 1)
         # segImageBackground = np.ones_like(segImage)-segImage
         if self.transform is not None:
             img_rgb = self.transform(img_rgb)
-            t=transforms.ToTensor()
-            segImage = torch.squeeze(t(segImage)).long()
+            segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
             # segImageBackground= t(segImageBackground)
             # segImages=t(np.stack((segImage,segImageBackground),axis=2))
-        return img_rgb, segImage
+        return img_rgb, segImage,rawSegImage
 
     def __len__(self):
         return len(self.filePairList)
