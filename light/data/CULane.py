@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 
 class CULaneDataset(Dataset):
-    NUM_CLASS = 1
+    NUM_CLASS = 2
     def __init__(self, rootDir, split='train', mode='train', transform=None):
         self.rootDir = rootDir
         self.transform = transform
@@ -29,11 +29,13 @@ class CULaneDataset(Dataset):
         imageFile, segFile, _, _, _, _ = self.trainFilePairList[idx]
         img_rgb = Image.open(imageFile).convert('RGB')
         segImage = np.clip(cv2.imread(segFile, cv2.IMREAD_UNCHANGED), 0, 1)
-
+        # segImageBackground = np.ones_like(segImage)-segImage
         if self.transform is not None:
             img_rgb = self.transform(img_rgb)
             t=transforms.ToTensor()
-            segImage = t(segImage)
+            segImage = torch.squeeze(t(segImage)).long()
+            # segImageBackground= t(segImageBackground)
+            # segImages=t(np.stack((segImage,segImageBackground),axis=2))
         return img_rgb, segImage
 
     def __len__(self):

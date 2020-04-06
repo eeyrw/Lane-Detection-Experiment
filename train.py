@@ -152,7 +152,8 @@ class Trainer(object):
                 self.model.load_state_dict(torch.load(args.resume, map_location=lambda storage, loc: storage))
 
         # create criterion
-        self.criterion = SoftDiceLoss().to(self.device) #MixSoftmaxCrossEntropyLoss(args.aux, args.aux_weight, ignore_index=-1).to(self.device)
+        self.criterion = MixSoftmaxCrossEntropyLoss(args.aux, args.aux_weight, ignore_index=-1).to(self.device)
+        # self.criterion = SoftDiceLoss().to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
