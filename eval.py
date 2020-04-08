@@ -134,7 +134,7 @@ class Evaler(object):
             val_batch_sampler = make_batch_data_sampler(
                 val_sampler, args.batch_size)
             self.val_loader = data.DataLoader(dataset=valset,
-                                              batch_sampler=val_batch_sampler,
+                                              shuffle=True,#batch_sampler=val_batch_sampler,
                                               num_workers=args.workers,
                                               pin_memory=True)
 
