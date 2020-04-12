@@ -23,7 +23,7 @@ import torch.utils.data as data
 import torch.backends.cudnn as cudnn
 import time
 from parameter import getParameter
-
+from DiceLoss import BatchSoftDiceLoss
 
 
 class Trainer(object):
@@ -80,9 +80,10 @@ class Trainer(object):
                     args.resume, map_location=lambda storage, loc: storage))
 
         # create criterion
-        self.criterion = MixSoftmaxCrossEntropyLoss(
-            args.aux, args.aux_weight, ignore_index=-1).to(self.device)
+        # self.criterion = MixSoftmaxCrossEntropyLoss(
+        #    args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
+        self.criterion = BatchSoftDiceLoss().to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
@@ -127,13 +128,13 @@ class Trainer(object):
             targets = targets.to(self.device)
 
             outputs = self.model(images)
-            loss_dict = self.criterion(outputs, targets)
+            loss_dict = self.criterion(outputs[0], targets)
 
-            losses = sum(loss for loss in loss_dict.values())
+            losses = loss_dict#sum(loss for loss in loss_dict.values())
 
             # reduce losses over all GPUs for logging purposes
-            loss_dict_reduced = reduce_loss_dict(loss_dict)
-            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+            # loss_dict_reduced = reduce_loss_dict(loss_dict)
+            # losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
             self.optimizer.zero_grad()
             losses.backward()
