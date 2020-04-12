@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 
 
 class CULaneDataset(Dataset):
-    NUM_CLASS = 1
+    NUM_CLASS = 2
 
     splitDict = {
         'train': {'isTest': False, 'dir': 'list/train_gt.txt'},

@@ -105,7 +105,7 @@ class Evaler(object):
         data_kwargs = {'transformForImage': self.transformForImage,
                        'rootDir': args.rootDir, 'requireRawImage': True}
         valset = get_segmentation_dataset(
-            args.dataset, split='test8_night', **data_kwargs)
+            args.dataset, split='test0_normal', **data_kwargs)
         self.val_loader = data.DataLoader(dataset=valset,
                                           shuffle=True,
                                           num_workers=args.workers,
@@ -218,6 +218,6 @@ if __name__ == '__main__':
         args.device = "cpu"
 
     evaler = Evaler(args)
-    # evaler.eval()
-    evaler.evalOnSingleImage(r"D:\tusimple\train_set\clips\0601\1494452439568910656\2.jpg")
+    evaler.eval()
+    # evaler.evalOnSingleImage(r"D:\tusimple\train_set\clips\0601\1494452439568910656\2.jpg")
     torch.cuda.empty_cache()

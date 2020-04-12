@@ -67,7 +67,7 @@ class _LRASPP(nn.Module):
         feat1 = self.b0(x)
         feat2 = self.b1(x)
         feat2 = F.interpolate(feat2, size, mode='bilinear', align_corners=True)
-        x = feat1 * feat2  # check it
+        x = feat1 #* feat2  # check it
         return x
 
 
