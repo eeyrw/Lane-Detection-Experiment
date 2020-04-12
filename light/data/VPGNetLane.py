@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data.dataset import Dataset
 
 
-class CULaneDataset(Dataset):
+class VPGNetLane(Dataset):
     NUM_CLASS = 2
 
     splitDict = {
