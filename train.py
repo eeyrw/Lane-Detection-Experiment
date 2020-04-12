@@ -24,6 +24,7 @@ import torch.backends.cudnn as cudnn
 import time
 from parameter import getParameter
 from DiceLoss import BatchSoftDiceLoss
+from DiceLoss import BatchSoftBinaryDiceLoss
 
 
 class Trainer(object):
@@ -83,7 +84,7 @@ class Trainer(object):
         # self.criterion = MixSoftmaxCrossEntropyLoss(
         #    args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
-        self.criterion = BatchSoftDiceLoss().to(self.device)
+        self.criterion = BatchSoftBinaryDiceLoss().to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),

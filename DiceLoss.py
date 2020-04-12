@@ -112,6 +112,7 @@ class BatchSoftBinaryDiceLoss(nn.Module):
         '''
         # overcome ignored label
         logits = logits.float()
+        logits = logits.squeeze()
         # compute loss
         probs = torch.sigmoid(logits)
         numer = torch.sum((probs*logits), dim=(1, 2))
@@ -147,7 +148,7 @@ if __name__ == '__main__':
     label = torch.randint(0, 2, (16, 14, 14)).long()
     net = torch.nn.Conv2d(3, 1, 3, 1, 1)
 
-    logits = net(im).squeeze()
+    logits = net(im)
     loss = criteria(logits, label)
     loss.backward()
     print(loss)
