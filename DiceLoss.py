@@ -95,18 +95,59 @@ class BatchSoftDiceLoss(nn.Module):
         return loss
 
 
+class BatchSoftBinaryDiceLoss(nn.Module):
+    def __init__(self,
+                 p=1,
+                 smooth=1,
+                 weight=None):
+        super(BatchSoftBinaryDiceLoss, self).__init__()
+        self.p = p
+        self.smooth = smooth
+        self.weight = None if weight is None else torch.tensor(weight)
+
+    def forward(self, logits, label):
+        '''
+        args: logits: tensor of shape (N, H, W)
+        args: label: tensor of shape(N, H, W)
+        '''
+        # overcome ignored label
+        logits = logits.float()
+        # compute loss
+        probs = torch.sigmoid(logits)
+        numer = torch.sum((probs*logits), dim=(1, 2))
+        denom = torch.sum(probs.pow(self.p)+logits.pow(self.p), dim=(1, 2))
+        if not self.weight is None:
+            numer = numer * self.weight.view(1, -1)
+            denom = denom * self.weight.view(1, -1)
+        numer = torch.sum(numer)
+        denom = torch.sum(denom)
+        loss = 1 - (2*numer+self.smooth)/(denom+self.smooth)
+        return loss
+
 if __name__ == '__main__':
+    # #  criteria = GeneralizedSoftDiceLoss()
+    # criteria = BatchSoftDiceLoss()
+    # #  logits = torch.randn(16, 19, 14, 14)
+    # im = torch.randn(16, 3, 14, 14)
+    # label = torch.randint(0, 19, (16, 14, 14)).long()
+    # net = torch.nn.Conv2d(3, 19, 3, 1, 1)
+    # print(label.dtype)
+    # label[2, 3, 3] = 255
+    # print(label.dtype)
+
+    # logits = net(im)
+    # loss = criteria(logits, label)
+    # loss.backward()
+    # print(loss)
+
     #  criteria = GeneralizedSoftDiceLoss()
-    criteria = BatchSoftDiceLoss()
+    criteria = BatchSoftBinaryDiceLoss()
     #  logits = torch.randn(16, 19, 14, 14)
     im = torch.randn(16, 3, 14, 14)
-    label = torch.randint(0, 19, (16, 14, 14)).long()
-    net = torch.nn.Conv2d(3, 19, 3, 1, 1)
-    print(label.dtype)
-    label[2, 3, 3] = 255
-    print(label.dtype)
+    label = torch.randint(0, 2, (16, 14, 14)).long()
+    net = torch.nn.Conv2d(3, 1, 3, 1, 1)
 
-    logits = net(im)
+    logits = net(im).squeeze()
     loss = criteria(logits, label)
     loss.backward()
     print(loss)
