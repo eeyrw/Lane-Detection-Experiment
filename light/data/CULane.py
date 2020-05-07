@@ -34,6 +34,7 @@ class CULaneDataset(Dataset):
         self.split = split
         self.mode = mode
         self.framesGroupSize = framesGroupSize
+        self.dataSetLen = 0
 
         self.filePairList = []
         self.indexFilePath = os.path.join(
@@ -63,41 +64,54 @@ class CULaneDataset(Dataset):
                     segImagePath = os.path.join(
                         rootDir, 'laneseg_label_w16_test', baseDir, fileNameWithoutExt+'.png')
 
-                self.filePairList.append(
-                    (os.path.join(rootDir, imagePath), os.path.join(rootDir, segImagePath)))
-                framesGroupName = os.path.basename(os.path.dirname(imagePath))
+                if self.mode == 'discrete':
+                    self.filePairList.append(
+                        (os.path.join(rootDir, imagePath), os.path.join(rootDir, segImagePath)))
+                else:
+                    framesGroupName = os.path.basename(
+                        os.path.dirname(imagePath))
+                    rawframesGroupDict.setdefault(framesGroupName, []).append(
+                        (os.path.join(rootDir, imagePath), os.path.join(rootDir, segImagePath)))
 
-                rawframesGroupDict.setdefault(framesGroupName, []).append(
-                    (os.path.join(rootDir, imagePath), os.path.join(rootDir, segImagePath)))
-
-            self.framesGroupDict = self._sliceFramesGroup(rawframesGroupDict)
+            if self.mode == 'discrete':
+                self.dataSetLen = len(self.filePairList)
+            else:
+                self.framesGroupList = self._sliceFramesGroup(
+                    rawframesGroupDict)
+                self.dataSetLen = len(self.framesGroupList)
 
     def __getitem__(self, idx):
-        imageFile, segFile = self.filePairList[idx]
+        if self.mode == 'discrete':
+            return self._filePairToTensor(self.filePairList[idx], self.requireRawImage)
+        else:
+            return [self._filePairToTensor(filePair, self.requireRawImage) for filePair in self.framesGroupList[idx]]
+
+    def __len__(self):
+        return self.dataSetLen
+
+    def _filePairToTensor(self, filePair, requireRawImage):
+        imageFile, segFile = filePair
         rawImageRgb = Image.open(imageFile).convert('RGB')
         rawSegImage = np.clip(cv2.imread(
             segFile, cv2.IMREAD_UNCHANGED), 0, 1)
         if self.transformForImage is not None:
             imageRgb = self.transformForImage(rawImageRgb)
         else:
-            imageRgb = transforms.ToTensor()(imageRgb)
+            imageRgb = transforms.ToTensor()(rawImageRgb)
 
         segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
-        if self.requireRawImage:
+        if requireRawImage:
             return imageRgb, segImage, imageFile
         else:
             return imageRgb, segImage
 
-    def __len__(self):
-        return len(self.filePairList)
-
     def _sliceFramesGroup(self, rawframesGroupDict):
-        framesGroupDict = {}
-        for clipName, clips in rawframesGroupDict.items():
+        framesGroupList = []
+        for _, clips in rawframesGroupDict.items():
             clipNum = len(clips)
             for i in range(0, clipNum, self.framesGroupSize):
-                framesGroupDict['%s-%d' % (clipName, i)] = clips[i:i + self.framesGroupSize]
-        return framesGroupDict
+                framesGroupList.append(clips[i:i + self.framesGroupSize])
+        return framesGroupList
 
     @property
     def num_class(self):
@@ -105,4 +119,6 @@ class CULaneDataset(Dataset):
         return self.NUM_CLASS
 
 
-culaneDs = CULaneDataset('E:\CULane',split='test1_crowd')
+culaneDs = CULaneDataset('E:\CULane', split='test1_crowd', mode='consecutive')
+b = culaneDs[100]
+a = culaneDs[10]
