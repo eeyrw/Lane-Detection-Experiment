@@ -26,17 +26,21 @@ class CULaneDataset(Dataset):
         'test8_night': {'isTest': True, 'dir': 'list/test_split/test8_night.txt'},
     }
 
-    def __init__(self, rootDir, split='train', requireRawImage=False, transformForSeg=None, transformForImage=None):
+    def __init__(self, rootDir, split='train', mode='discrete', framesGroupSize=13, requireRawImage=False, transformForSeg=None, transformForImage=None):
         self.rootDir = rootDir
         self.transformForImage = transformForImage
         self.transformForSeg = transformForSeg
         self.requireRawImage = requireRawImage
         self.split = split
+        self.mode = mode
+        self.framesGroupSize = framesGroupSize
 
         self.filePairList = []
         self.indexFilePath = os.path.join(
             rootDir, self.splitDict[split]['dir'])
         self.isTest = self.splitDict[split]['isTest']
+
+        rawframesGroupDict = {}
 
         with open(self.indexFilePath, 'r') as f:
             for line in f.readlines():
@@ -61,6 +65,12 @@ class CULaneDataset(Dataset):
 
                 self.filePairList.append(
                     (os.path.join(rootDir, imagePath), os.path.join(rootDir, segImagePath)))
+                framesGroupName = os.path.basename(os.path.dirname(imagePath))
+
+                rawframesGroupDict.setdefault(framesGroupName, []).append(
+                    (os.path.join(rootDir, imagePath), os.path.join(rootDir, segImagePath)))
+
+            self.framesGroupDict = self._sliceFramesGroup(rawframesGroupDict)
 
     def __getitem__(self, idx):
         imageFile, segFile = self.filePairList[idx]
@@ -81,7 +91,18 @@ class CULaneDataset(Dataset):
     def __len__(self):
         return len(self.filePairList)
 
+    def _sliceFramesGroup(self, rawframesGroupDict):
+        framesGroupDict = {}
+        for clipName, clips in rawframesGroupDict.items():
+            clipNum = len(clips)
+            for i in range(0, clipNum, self.framesGroupSize):
+                framesGroupDict['%s-%d' % (clipName, i)] = clips[i:i + self.framesGroupSize]
+        return framesGroupDict
+
     @property
     def num_class(self):
         """Number of categories."""
         return self.NUM_CLASS
+
+
+culaneDs = CULaneDataset('E:\CULane',split='test1_crowd')
