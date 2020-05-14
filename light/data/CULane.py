@@ -84,7 +84,23 @@ class CULaneDataset(Dataset):
         if self.mode == 'discrete':
             return self._filePairToTensor(self.filePairList[idx], self.requireRawImage)
         else:
-            return [self._filePairToTensor(filePair, self.requireRawImage) for filePair in self.framesGroupList[idx]]
+            imagesRgb = []
+            segImages = []
+            imageFiles = []
+            for filePair in self.framesGroupList[idx]:
+                if self.requireRawImage:
+                    imageRgb, segImage, imageFile = self._filePairToTensor(
+                        filePair, self.requireRawImage)
+                    imageFiles.append(imageFile)
+                else:
+                    imageRgb, segImage = self._filePairToTensor(
+                        filePair, self.requireRawImage)
+                imagesRgb.append(imageRgb)
+                segImages.append(segImage)
+            if self.requireRawImage:
+                return torch.stack(imagesRgb), torch.stack(segImages), torch.stack(imageFiles)
+            else:
+                return torch.stack(imagesRgb), torch.stack(segImages)
 
     def __len__(self):
         return self.dataSetLen
@@ -92,6 +108,8 @@ class CULaneDataset(Dataset):
     def _filePairToTensor(self, filePair, requireRawImage):
         imageFile, segFile = filePair
         rawImageRgb = Image.open(imageFile).convert('RGB')
+        rawImageRgb = transforms.functional.resize(
+            rawImageRgb, (256, 512), interpolation=2)
         rawSegImage = np.clip(cv2.imread(
             segFile, cv2.IMREAD_UNCHANGED), 0, 1)
         if self.transformForImage is not None:
