@@ -29,7 +29,7 @@ class CULaneDataset(Dataset):
     def __init__(self, rootDir,
                  split='train',
                  mode='discrete',
-                 framesGroupSize=13,
+                 framesGroupSize=2,
                  requireRawImage=False,
                  transformForSeg=None,
                  transformForImage=None,
