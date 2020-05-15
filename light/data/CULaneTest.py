@@ -3,7 +3,11 @@ import numpy as np
 from CULane import CULaneDataset
 import collections
 
-culaneDs = CULaneDataset('E:\CULane', split='test1_crowd', mode='consecutive')
+culaneDs = CULaneDataset('E:\CULane',
+                         split='test1_crowd',
+                         mode='consecutive',
+                         resizeAndCropTo=(512, 256)
+                         )
 
 
 writer = SummaryWriter()

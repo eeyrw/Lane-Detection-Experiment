@@ -26,7 +26,15 @@ class CULaneDataset(Dataset):
         'test8_night': {'isTest': True, 'dir': 'list/test_split/test8_night.txt'},
     }
 
-    def __init__(self, rootDir, split='train', mode='discrete', framesGroupSize=13, requireRawImage=False, transformForSeg=None, transformForImage=None):
+    def __init__(self, rootDir,
+                 split='train',
+                 mode='discrete',
+                 framesGroupSize=13,
+                 requireRawImage=False,
+                 transformForSeg=None,
+                 transformForImage=None,
+                 resizeAndCropTo=(-1, -1)
+                 ):
         self.rootDir = rootDir
         self.transformForImage = transformForImage
         self.transformForSeg = transformForSeg
@@ -35,6 +43,13 @@ class CULaneDataset(Dataset):
         self.mode = mode
         self.framesGroupSize = framesGroupSize
         self.dataSetLen = 0
+        self.wantedWidth = resizeAndCropTo(0)
+        self.wantedHeight = resizeAndCropTo(1)
+
+        if self.wantedWidth > 0 and self.wantedHeight > 0:
+            self.doResizeAndCrop = True
+        else:
+            self.doResizeAndCrop = False
 
         self.filePairList = []
         self.indexFilePath = os.path.join(
@@ -105,11 +120,29 @@ class CULaneDataset(Dataset):
     def __len__(self):
         return self.dataSetLen
 
+    def _resizeAndCropToTargetSize(self, img, width, height):
+        rawW, rawH = img.size
+        rawAspectRatio = rawW/rawH
+        wantedAspectRatio = width/height
+        if rawAspectRatio > wantedAspectRatio:
+            scaleFactor = height/rawH
+            widthBeforeCrop = int(rawW*scaleFactor)
+            return img.resize((widthBeforeCrop, height), Image.BILINEAR). \
+                crop(((widthBeforeCrop-width)//2, 0,
+                      (widthBeforeCrop-width)//2+width, height))
+        else:
+            scaleFactor = width/rawW
+            heightBeforeCrop = int(rawH*scaleFactor)
+            return img.resize((width, heightBeforeCrop), Image.BILINEAR). \
+                crop((0, (heightBeforeCrop-height)//2, width,
+                      (heightBeforeCrop-height)//2+height))
+
     def _filePairToTensor(self, filePair, requireRawImage):
         imageFile, segFile = filePair
         rawImageRgb = Image.open(imageFile).convert('RGB')
-        rawImageRgb = transforms.functional.resize(
-            rawImageRgb, (256, 512), interpolation=2)
+        if self.doResizeAndCrop:
+            rawImageRgb = self._resizeAndCrop(
+                rawImageRgb, self.wantedWidth, self.wantedHeight)
         rawSegImage = np.clip(cv2.imread(
             segFile, cv2.IMREAD_UNCHANGED), 0, 1)
         if self.transformForImage is not None:
