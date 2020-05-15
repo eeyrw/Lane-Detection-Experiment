@@ -43,8 +43,8 @@ class CULaneDataset(Dataset):
         self.mode = mode
         self.framesGroupSize = framesGroupSize
         self.dataSetLen = 0
-        self.wantedWidth = resizeAndCropTo(0)
-        self.wantedHeight = resizeAndCropTo(1)
+        self.wantedWidth = resizeAndCropTo[0]
+        self.wantedHeight = resizeAndCropTo[1]
 
         if self.wantedWidth > 0 and self.wantedHeight > 0:
             self.doResizeAndCrop = True
