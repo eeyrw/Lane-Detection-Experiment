@@ -15,7 +15,7 @@ transfrom_all = pairedTr.Compose([
 input_transform = pairedTr.Compose([
     pairedTr.ColorJitter(0.3, 0.3, 0.3),
     pairedTr.ToTensor(),
-    pairedTr.RandomErasing(p=0.8),
+    pairedTr.RandomErasing(p=0.1),
     # pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
 ])
 
@@ -31,7 +31,8 @@ culaneDs = CULaneDataset('E:\CULane',
                          framesGroupSize=5,
                          transformForImage=input_transform,
                          transformForSeg=transfrom_seg,
-                         transformForAll=transfrom_all
+                         transformForAll=transfrom_all,
+                         segDistinguishInstance=True
                          )
 
 

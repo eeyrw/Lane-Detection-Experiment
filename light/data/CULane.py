@@ -9,7 +9,6 @@ from torch.utils.data.dataset import Dataset
 
 
 class CULaneDataset(Dataset):
-    NUM_CLASS = 2
 
     splitDict = {
         'train': {'isTest': False, 'dir': 'list/train_gt.txt'},
@@ -34,7 +33,8 @@ class CULaneDataset(Dataset):
                  transformForAll=None,
                  transformForSeg=None,
                  transformForImage=None,
-                 resizeAndCropTo=(-1, -1)
+                 resizeAndCropTo=(-1, -1),
+                 segDistinguishInstance=False,
                  ):
         self.rootDir = rootDir
         self.transformForAll = transformForAll
@@ -47,11 +47,17 @@ class CULaneDataset(Dataset):
         self.dataSetLen = 0
         self.wantedWidth = resizeAndCropTo[0]
         self.wantedHeight = resizeAndCropTo[1]
+        self.segDistinguishInstance = segDistinguishInstance
 
         if self.wantedWidth > 0 and self.wantedHeight > 0:
             self.doResizeAndCrop = True
         else:
             self.doResizeAndCrop = False
+
+        if self.segDistinguishInstance:
+            self.NUM_CLASS = 5
+        else:
+            self.NUM_CLASS = 2
 
         self.filePairList = []
         self.indexFilePath = os.path.join(
@@ -152,21 +158,23 @@ class CULaneDataset(Dataset):
                 rawSegImage, self.wantedWidth, self.wantedHeight)
 
         if self.transformForAll is not None:
-            rawImageRgb,rawSegImage = self.transformForAll(rawImageRgb,rawSegImage)
-
-        rawSegImage = np.clip(rawSegImage, 0, 1)    
+            rawImageRgb, rawSegImage = self.transformForAll(
+                rawImageRgb, rawSegImage)
 
         if self.transformForImage is not None:
             imageRgb = self.transformForImage(rawImageRgb)
         else:
             imageRgb = transforms.ToTensor()(rawImageRgb)
 
-        # if self.transformForSeg is not None:
-        #     segImage = self.transformForSeg(rawSegImage)
-        # else:
-        #     segImage = transforms.ToTensor()(rawSegImage)   
+        if self.transformForSeg is not None:
+            segImage = self.transformForSeg(rawSegImage)
 
-        segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
+        if not self.segDistinguishInstance:
+            rawSegImage = np.clip(rawSegImage, 0, 1)
+            segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
+        else:
+            segImage = torch.squeeze(transforms.ToTensor()(rawSegImage)).long()
+
         if requireRawImage:
             return imageRgb, segImage, imageFile
         else:
