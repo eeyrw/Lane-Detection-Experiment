@@ -176,6 +176,6 @@ class CULaneDataset(Dataset):
         return self.NUM_CLASS
 
 
-culaneDs = CULaneDataset('E:\CULane', split='test1_crowd', mode='consecutive')
-b = culaneDs[100]
-a = culaneDs[10]
+# culaneDs = CULaneDataset('E:\CULane', split='test1_crowd', mode='consecutive')
+# b = culaneDs[100]
+# a = culaneDs[10]
