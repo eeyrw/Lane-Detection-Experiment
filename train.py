@@ -188,6 +188,8 @@ class Trainer(object):
                         str(datetime.timedelta(seconds=int(time.time() - start_time))), eta_string))
 
                 writer.add_scalar('Loss/train', losses, iteration)
+                writer.add_scalar('HyperParameter/learning_rate', self.optimizer.param_groups[0]['lr'], iteration)
+
 
             if iteration % save_per_iters == 0 and save_to_disk:
                 save_checkpoint(self.model, self.args, is_best=False)
