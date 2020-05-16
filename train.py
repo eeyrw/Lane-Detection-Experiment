@@ -26,20 +26,54 @@ from parameter import getParameter
 from DiceLoss import BatchSoftDiceLoss
 from DiceLoss import BatchSoftBinaryDiceLoss
 from torch.utils.tensorboard import SummaryWriter
+import light.data.sync_transforms as pairedTr
+
 
 class Trainer(object):
     def __init__(self, args):
         self.args = args
         self.device = torch.device(args.device)
 
-        # image transform
-        input_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+        # image transform for train
+        transFormsForAll = pairedTr.Compose([
+            pairedTr.RandomPerspective(distortion_scale=0.3, p=0.2),
+            pairedTr.RandomResizedCrop(
+                (256, 512), scale=(0.6, 1.0), ratio=(2/1, 2/1)),
         ])
+
+        transFormsForImage = pairedTr.Compose([
+            pairedTr.ColorJitter(0.3, 0.3, 0.3),
+            pairedTr.ToTensor(),
+            pairedTr.RandomErasing(p=0.8),
+            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+
+        transFormsForSeg = None
+
+        # image transform for val
+
+        transFormsForAll_val = pairedTr.Compose([
+            pairedTr.RandomResizedCrop(
+                (256, 512), scale=(0.6, 1.0), ratio=(2/1, 2/1)),
+        ])
+
+        transFormsForImage_val = pairedTr.Compose([
+            pairedTr.ToTensor(),
+            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+
+        transFormsForSeg_val = None
+
         # dataset and dataloader
-        # data_kwargs = {'transform': input_transform, 'base_size': args.base_size, 'crop_size': args.crop_size}
-        data_kwargs = {'transformForImage': input_transform, 'rootDir': args.rootDir}
+        data_kwargs = {'transformForAll': transFormsForAll,
+                       'transformForImage': transFormsForImage,
+                       'transformForSeg': transFormsForSeg,
+                       'rootDir': args.rootDir}
+        data_kwargs_val = {'transformForAll': transFormsForAll_val,
+                           'transformForImage': transFormsForImage_val,
+                           'transformForSeg': transFormsForSeg_val,
+                           'rootDir': args.rootDir}
+
         trainset = get_segmentation_dataset(
             args.dataset, split='train', **data_kwargs)
         args.iters_per_epoch = len(
@@ -57,7 +91,7 @@ class Trainer(object):
 
         if not args.skip_val:
             valset = get_segmentation_dataset(
-                args.dataset, split='val', **data_kwargs)
+                args.dataset, split='val', **data_kwargs_val)
             val_sampler = make_data_sampler(valset, False, args.distributed)
             val_batch_sampler = make_batch_data_sampler(
                 val_sampler, args.batch_size)
@@ -120,7 +154,7 @@ class Trainer(object):
         start_time = time.time()
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
             epochs, max_iters))
-        writer = SummaryWriter()    
+        writer = SummaryWriter()
 
         self.model.train()
         for iteration, (images, targets) in enumerate(self.train_loader):
@@ -132,7 +166,7 @@ class Trainer(object):
             outputs = self.model(images)
             loss_dict = self.criterion(outputs[0], targets)
 
-            losses = loss_dict#sum(loss for loss in loss_dict.values())
+            losses = loss_dict  # sum(loss for loss in loss_dict.values())
 
             # reduce losses over all GPUs for logging purposes
             # loss_dict_reduced = reduce_loss_dict(loss_dict)

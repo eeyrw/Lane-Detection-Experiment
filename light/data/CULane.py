@@ -31,11 +31,13 @@ class CULaneDataset(Dataset):
                  mode='discrete',
                  framesGroupSize=2,
                  requireRawImage=False,
+                 transformForAll=None,
                  transformForSeg=None,
                  transformForImage=None,
                  resizeAndCropTo=(-1, -1)
                  ):
         self.rootDir = rootDir
+        self.transformForAll = transformForAll
         self.transformForImage = transformForImage
         self.transformForSeg = transformForSeg
         self.requireRawImage = requireRawImage
@@ -149,12 +151,20 @@ class CULaneDataset(Dataset):
             rawSegImage = self._resizeAndCropToTargetSize(
                 rawSegImage, self.wantedWidth, self.wantedHeight)
 
-        rawSegImage = np.clip(rawSegImage, 0, 1)
+        if self.transformForAll is not None:
+            rawImageRgb,rawSegImage = self.transformForAll(rawImageRgb,rawSegImage)
+
+        rawSegImage = np.clip(rawSegImage, 0, 1)    
 
         if self.transformForImage is not None:
             imageRgb = self.transformForImage(rawImageRgb)
         else:
             imageRgb = transforms.ToTensor()(rawImageRgb)
+
+        # if self.transformForSeg is not None:
+        #     segImage = self.transformForSeg(rawSegImage)
+        # else:
+        #     segImage = transforms.ToTensor()(rawSegImage)   
 
         segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
         if requireRawImage:
