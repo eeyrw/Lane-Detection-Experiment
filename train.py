@@ -25,7 +25,7 @@ import time
 from parameter import getParameter
 from DiceLoss import BatchSoftDiceLoss
 from DiceLoss import BatchSoftBinaryDiceLoss
-
+from torch.utils.tensorboard import SummaryWriter
 
 class Trainer(object):
     def __init__(self, args):
@@ -120,6 +120,7 @@ class Trainer(object):
         start_time = time.time()
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
             epochs, max_iters))
+        writer = SummaryWriter()    
 
         self.model.train()
         for iteration, (images, targets) in enumerate(self.train_loader):

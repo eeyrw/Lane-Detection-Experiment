@@ -120,6 +120,7 @@ class CULaneDataset(Dataset):
     def __len__(self):
         return self.dataSetLen
 
+    @classmethod
     def _resizeAndCropToTargetSize(self, img, width, height):
         rawW, rawH = img.size
         rawAspectRatio = rawW/rawH
@@ -140,11 +141,16 @@ class CULaneDataset(Dataset):
     def _filePairToTensor(self, filePair, requireRawImage):
         imageFile, segFile = filePair
         rawImageRgb = Image.open(imageFile).convert('RGB')
+        rawSegImage = Image.open(segFile)
+
         if self.doResizeAndCrop:
-            rawImageRgb = self._resizeAndCrop(
+            rawImageRgb = self._resizeAndCropToTargetSize(
                 rawImageRgb, self.wantedWidth, self.wantedHeight)
-        rawSegImage = np.clip(cv2.imread(
-            segFile, cv2.IMREAD_UNCHANGED), 0, 1)
+            rawSegImage = self._resizeAndCropToTargetSize(
+                rawSegImage, self.wantedWidth, self.wantedHeight)
+
+        rawSegImage = np.clip(rawSegImage, 0, 1)
+
         if self.transformForImage is not None:
             imageRgb = self.transformForImage(rawImageRgb)
         else:
