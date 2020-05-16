@@ -44,7 +44,7 @@ class Trainer(object):
         transFormsForImage = pairedTr.Compose([
             pairedTr.ColorJitter(0.3, 0.3, 0.3),
             pairedTr.ToTensor(),
-            pairedTr.RandomErasing(p=0.8),
+            pairedTr.RandomErasing(p=0.2),
             pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
         ])
 
@@ -187,11 +187,14 @@ class Trainer(object):
                         iteration, max_iters, self.optimizer.param_groups[0]['lr'], losses,
                         str(datetime.timedelta(seconds=int(time.time() - start_time))), eta_string))
 
+                writer.add_scalar('Loss/train', losses, iteration)
+
             if iteration % save_per_iters == 0 and save_to_disk:
                 save_checkpoint(self.model, self.args, is_best=False)
 
             if not self.args.skip_val and iteration % val_per_iters == 0:
-                self.validation()
+                mIoU = self.validation()
+                writer.add_scalar('mIoU/val', mIoU, iteration)
                 self.model.train()
 
         save_checkpoint(self.model, self.args, is_best=False)
@@ -229,6 +232,7 @@ class Trainer(object):
             self.best_pred = new_pred
         save_checkpoint(self.model, self.args, is_best)
         synchronize()
+        return mIoU
 
 
 def save_checkpoint(model, args, is_best=False):
@@ -279,3 +283,4 @@ if __name__ == '__main__':
     trainer = Trainer(args)
     trainer.train()
     torch.cuda.empty_cache()
+    writer.close()
