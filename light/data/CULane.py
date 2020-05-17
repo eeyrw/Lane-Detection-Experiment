@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 
 
 class CULaneDataset(Dataset):
-
+    NUM_CLASS=2
     splitDict = {
         'train': {'isTest': False, 'dir': 'list/train_gt.txt'},
         'val': {'isTest': False, 'dir': 'list/val_gt.txt'},
@@ -149,7 +149,7 @@ class CULaneDataset(Dataset):
     def _filePairToTensor(self, filePair, requireRawImage):
         imageFile, segFile = filePair
         rawImageRgb = Image.open(imageFile).convert('RGB')
-        rawSegImage = Image.open(segFile)
+        rawSegImage = Image.open(segFile).convert('L')
 
         if self.doResizeAndCrop:
             rawImageRgb = self._resizeAndCropToTargetSize(
@@ -173,7 +173,7 @@ class CULaneDataset(Dataset):
             rawSegImage = np.clip(rawSegImage, 0, 1)
             segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
         else:
-            segImage = torch.squeeze(transforms.ToTensor()(rawSegImage)).long()
+            segImage = torch.squeeze(torch.from_numpy(np.array(rawSegImage))).long()
 
         if requireRawImage:
             return imageRgb, segImage, imageFile

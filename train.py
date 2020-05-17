@@ -145,11 +145,23 @@ class Trainer(object):
 
         self.best_pred = 0.0
 
+    def visualizeImageAndLabel(self,writer,image,label):
+        maxVal=torch.max(image)
+        minVal=torch.min(image)
+        imageNormalized=(image-minVal)/(maxVal-minVal)
+        maxVal=torch.max(label)
+        minVal=torch.min(label)
+        labelNormalized=(label.float()-minVal)/(maxVal-minVal)
+        writer.add_image('DsInspect/InputImage', imageNormalized, 0, dataformats='CHW')
+        writer.add_image('DsInspect/Label', labelNormalized.unsqueeze(0), 0, dataformats='CHW')
+
     def train(self):
         save_to_disk = get_rank() == 0
         epochs, max_iters = self.args.epochs, self.args.max_iters
         log_per_iters, val_per_iters = self.args.log_iter, self.args.val_epoch * \
             self.args.iters_per_epoch
+
+        checkDsPerIters=1000    
         save_per_iters = self.args.save_epoch * self.args.iters_per_epoch
         start_time = time.time()
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
@@ -198,6 +210,9 @@ class Trainer(object):
                 mIoU = self.validation()
                 writer.add_scalar('mIoU/val', mIoU, iteration)
                 self.model.train()
+
+            if iteration % checkDsPerIters == 0 or iteration==1:
+                self.visualizeImageAndLabel(writer,images[0],targets[0])
 
         save_checkpoint(self.model, self.args, is_best=False)
         total_training_time = time.time() - start_time
