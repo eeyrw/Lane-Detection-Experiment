@@ -115,10 +115,11 @@ class Trainer(object):
                     args.resume, map_location=lambda storage, loc: storage))
 
         # create criterion
-        self.criterion = MixSoftmaxCrossEntropyLoss(
-            args.aux, args.aux_weight, ignore_index=-1).to(self.device)
+        # self.criterion = MixSoftmaxCrossEntropyLoss(
+        #   args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
         # self.criterion = BatchSoftDiceLoss().to(self.device)
+        self.criterion = torch.nn.BCEWithLogitsLoss(reduction='mean').to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
@@ -178,10 +179,10 @@ class Trainer(object):
             iteration += 1
 
             images = images.to(self.device)
-            targets = targets.to(self.device)
+            targets = targets.float().to(self.device)
 
             outputs = self.model(images)
-            loss_dict = self.criterion(outputs[0], targets)
+            loss_dict = self.criterion(outputs[0].squeeze(1), targets)
 
             losses = loss_dict  # sum(loss for loss in loss_dict.values())
 

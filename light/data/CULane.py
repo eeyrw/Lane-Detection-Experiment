@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 
 
 class CULaneDataset(Dataset):
-    NUM_CLASS=2
+    NUM_CLASS=1
     splitDict = {
         'train': {'isTest': False, 'dir': 'list/train_gt.txt'},
         'val': {'isTest': False, 'dir': 'list/val_gt.txt'},
@@ -57,7 +57,7 @@ class CULaneDataset(Dataset):
         if self.segDistinguishInstance:
             self.NUM_CLASS = 5
         else:
-            self.NUM_CLASS = 2
+            self.NUM_CLASS = 1
 
         self.filePairList = []
         self.indexFilePath = os.path.join(
