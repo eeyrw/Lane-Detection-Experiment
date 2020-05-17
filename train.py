@@ -115,10 +115,10 @@ class Trainer(object):
                     args.resume, map_location=lambda storage, loc: storage))
 
         # create criterion
-        # self.criterion = MixSoftmaxCrossEntropyLoss(
-        #    args.aux, args.aux_weight, ignore_index=-1).to(self.device)
+        self.criterion = MixSoftmaxCrossEntropyLoss(
+            args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
-        self.criterion = BatchSoftDiceLoss().to(self.device)
+        # self.criterion = BatchSoftDiceLoss().to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
