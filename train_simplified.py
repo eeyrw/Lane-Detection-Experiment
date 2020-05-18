@@ -99,9 +99,15 @@ class Trainer(object):
                                               pin_memory=True)
 
         # create network
-        BatchNorm2d = nn.SyncBatchNorm if args.distributed else nn.BatchNorm2d
         self.model = get_segmentation_model(args.model, dataset=args.dataset,
-                                            aux=args.aux, norm_layer=BatchNorm2d).to(self.device)
+                                            aux=args.aux, norm_layer=nn.BatchNorm2d)
+
+        if torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+            self.model = nn.DataParallel(self.model)
+
+        self.model.to(self.device)                                  
 
         # resume checkpoint if needed
         if args.resume:
@@ -131,13 +137,6 @@ class Trainer(object):
                                          warmup_iters=args.warmup_iters,
                                          warmup_method=args.warmup_method)
 
-        if args.distributed:
-            self.model = nn.parallel.DistributedDataParallel(self.model,
-                                                             device_ids=[
-                                                                 args.local_rank],
-                                                             output_device=args.local_rank,
-                                                             find_unused_parameters=True)
-
         # evaluation metrics
         self.metric = SegmentationMetric(trainset.num_class)
 
@@ -162,13 +161,7 @@ class Trainer(object):
             targets = targets.to(self.device)
 
             outputs = self.model(images)
-            loss_dict = self.criterion(outputs[0], targets)
-
-            losses = loss_dict  # sum(loss for loss in loss_dict.values())
-
-            # reduce losses over all GPUs for logging purposes
-            # loss_dict_reduced = reduce_loss_dict(loss_dict)
-            # losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+            losses = self.criterion(outputs[0], targets)
 
             self.optimizer.zero_grad()
             losses.backward()
@@ -243,8 +236,6 @@ def save_checkpoint(model, args, is_best=False):
     filename = '{}_{}.pth'.format(args.model, args.dataset)
     filename = os.path.join(directory, filename)
 
-    if args.distributed:
-        model = model.module
     torch.save(model.state_dict(), filename)
     if is_best:
         best_filename = '{}_{}_best_model.pth'.format(args.model, args.dataset)
@@ -268,11 +259,7 @@ if __name__ == '__main__':
     else:
         args.distributed = False
         args.device = "cpu"
-    if args.distributed:
-        torch.cuda.set_device(args.local_rank)
-        torch.distributed.init_process_group(
-            backend="nccl", init_method="env://")
-        synchronize()
+
     args.lr = args.lr * num_gpus
 
     logger = setup_logger(args.model, args.log_dir, get_rank(), filename='{}_{}_log.txt'.format(
