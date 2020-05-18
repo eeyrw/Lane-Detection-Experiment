@@ -17,8 +17,8 @@ def str2bool(v):
 def getParameter(bypassArgs=None):
     parser = argparse.ArgumentParser(description='Lane Detection Experiment')
     # model and dataset
-    parser.add_argument('--model', type=str, default='mobilenetv3_small',
-                        help='model name (default: mobilenetv3_small)')
+    parser.add_argument('--model', type=str, default='erfnet',
+                        help='model name (default: erfnet)')
     parser.add_argument('--dataset', type=str, default='culane',
                         help='dataset name (default: culane)')
     parser.add_argument('--rootDir', type=str, default=r'E:\CULane',

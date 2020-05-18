@@ -119,7 +119,7 @@ class Trainer(object):
         #   args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
         # self.criterion = BatchSoftDiceLoss().to(self.device)
-        self.criterion = torch.nn.BCEWithLogitsLoss(reduction='mean').to(self.device)
+        self.criterion = torch.nn.BCEWithLogitsLoss(reduction='mean',pos_weight=20).to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
@@ -157,7 +157,7 @@ class Trainer(object):
         minVal = torch.min(output)
         outputNormalized = (output.float()-minVal)/(maxVal-minVal)
         writer.add_image('DsInspect/In',imageNormalized, 0, dataformats='CHW')
-        writer.add_images('DsInspect/Label_Out', torch.stack((labelNormalized.unsqueeze(0),outputNormalized.unsqueeze(0))), 0, dataformats='NCHW')
+        writer.add_images('DsInspect/Label_Out', torch.stack((labelNormalized,outputNormalized)), 0, dataformats='NCHW')
         # writer.add_image('DsInspect/Out', outputNormalized.unsqueeze(0), 0, dataformats='CHW')
 
 
@@ -179,16 +179,11 @@ class Trainer(object):
             iteration += 1
 
             images = images.to(self.device)
-            targets = targets.float().to(self.device)
+            targets = targets.to(self.device)
 
             outputs = self.model(images)
-            loss_dict = self.criterion(outputs[0].squeeze(1), targets)
+            losses = self.criterion(outputs, targets)
 
-            losses = loss_dict  # sum(loss for loss in loss_dict.values())
-
-            # reduce losses over all GPUs for logging purposes
-            # loss_dict_reduced = reduce_loss_dict(loss_dict)
-            # losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
             self.optimizer.zero_grad()
             losses.backward()
@@ -218,7 +213,7 @@ class Trainer(object):
                 self.model.train()
 
             if iteration % checkDsPerIters == 0 or iteration == 1:
-                self.visualizeImageAndLabel(writer, images[0], targets[0],outputs[0][0][0])
+                self.visualizeImageAndLabel(writer, images[0], targets[0],torch.sigmoid(outputs[0]))
 
         save_checkpoint(self.model, self.args, is_best=False)
         total_training_time = time.time() - start_time

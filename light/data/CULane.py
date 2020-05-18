@@ -171,9 +171,9 @@ class CULaneDataset(Dataset):
 
         if not self.segDistinguishInstance:
             rawSegImage = np.clip(rawSegImage, 0, 1)
-            segImage = torch.squeeze(torch.from_numpy(rawSegImage)).long()
+            segImage = torch.from_numpy(rawSegImage).unsqueeze(0).float()
         else:
-            segImage = torch.squeeze(torch.from_numpy(np.array(rawSegImage))).long()
+            segImage =torch.from_numpy(np.array(rawSegImage)).unsqueeze(0).float()
 
         if requireRawImage:
             return imageRgb, segImage, imageFile

@@ -20,16 +20,16 @@ class MobileNetV3Seg(BaseModel):
     def forward(self, x):
         size = x.size()[2:]
         _, c2, _, c4 = self.base_forward(x)
-        outputs = list()
+        # outputs = list()
         x = self.head(c4)
         x = F.interpolate(x, size, mode='bilinear', align_corners=True)
-        outputs.append(x)
+        # outputs.append(x)
 
-        if self.aux:
-            auxout = self.auxlayer(c2)
-            auxout = F.interpolate(auxout, size, mode='bilinear', align_corners=True)
-            outputs.append(auxout)
-        return tuple(outputs)
+        # if self.aux:
+        #     auxout = self.auxlayer(c2)
+        #     auxout = F.interpolate(auxout, size, mode='bilinear', align_corners=True)
+        #     outputs.append(auxout)
+        return x
 
 
 class _Head(nn.Module):
@@ -67,7 +67,7 @@ class _LRASPP(nn.Module):
         feat1 = self.b0(x)
         feat2 = self.b1(x)
         feat2 = F.interpolate(feat2, size, mode='bilinear', align_corners=True)
-        x = feat1 #* feat2  # check it
+        x = feat1 * feat2  # check it
         return x
 
 
