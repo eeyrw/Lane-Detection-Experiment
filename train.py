@@ -119,7 +119,7 @@ class Trainer(object):
         #   args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
         # self.criterion = BatchSoftDiceLoss().to(self.device)
-        self.criterion = torch.nn.BCEWithLogitsLoss(reduction='mean',pos_weight=20).to(self.device)
+        self.criterion = torch.nn.BCEWithLogitsLoss(reduction='mean').to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
