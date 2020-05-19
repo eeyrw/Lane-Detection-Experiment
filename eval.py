@@ -51,7 +51,7 @@ def str2bool(v):
 def parse_args(bypassArgs=None):
     parser = argparse.ArgumentParser(description='Lane Detection Experiment')
     # model and dataset
-    parser.add_argument('--model', type=str, default='mobilenetv3_small',
+    parser.add_argument('--model', type=str, default='erfnet',
                         help='model name (default: mobilenet)')
     parser.add_argument('--dataset', type=str, default='culane',
                         help='dataset name (default: culane)')
@@ -75,7 +75,7 @@ def parse_args(bypassArgs=None):
                         dest='cuda_usage', help='Whether to use CUDA.')
     parser.add_argument('--local_rank', type=int, default=0)
     # checkpoint and log
-    parser.add_argument('--resume', type=str, default='mobilenetv3_small_culane_best_model.pth',
+    parser.add_argument('--resume', type=str, default='erfnet_culane.pth',
                         help='put the path to resuming file if needed')
     parser.add_argument('--save-dir', default='~/.torch/models',
                         help='Directory for saving checkpoint models')
@@ -98,14 +98,18 @@ class Evaler(object):
 
         # image transform
         self.transformForImage = transforms.Compose([
+            transforms.RandomResizedCrop((256, 512), scale=(0.8, 1.0), ratio=(2/1, 2/1)),
             transforms.ToTensor(),
             transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
         ])
 
         data_kwargs = {'transformForImage': self.transformForImage,
-                       'rootDir': args.rootDir, 'requireRawImage': True}
+                       'rootDir': args.rootDir, 
+                       'requireRawImage': True
+                       #'resizeAndCropTo':(512,256)
+                       }
         valset = get_segmentation_dataset(
-            args.dataset, split='test0_normal', **data_kwargs)
+            args.dataset, split='test8_night', **data_kwargs)
         self.val_loader = data.DataLoader(dataset=valset,
                                           shuffle=True,
                                           num_workers=args.workers,
@@ -137,8 +141,8 @@ class Evaler(object):
             # target = target.to(self.device)
             with torch.no_grad():
                 outputs = model(image)
-                aaa = torch.sigmoid(outputs[0][0][1])
-                bbb = torch.sigmoid(outputs[0][0][0])
+                aaa = torch.sigmoid(outputs[0][0])
+                bbb = torch.sigmoid(outputs[0][0])
 
                 fig = Figure(figsize=(16, 9))
                 fig.tight_layout()
@@ -152,12 +156,12 @@ class Evaler(object):
                 # plt.subplot(221)
                 ax11.imshow(aaa, cmap=plt.cm.rainbow, vmin=0, vmax=1)
                 # plt.subplot(212)
-                rawImage = cv2.imread(rawImageFile[0])[..., ::-1]
-                ax2.imshow(rawImage)
+                # rawImage = cv2.imread(rawImageFile[0])[..., ::-1]
+                ax2.imshow(image[0][0])
                 ax2.imshow(aaa, alpha=aaa,cmap=plt.cm.rainbow, vmin=0, vmax=1)
                 print('Current Image Path: %s' % rawImageFile)
                 # plt.subplot(222)
-                ax12.imshow(target[0], cmap=plt.cm.rainbow, vmin=0, vmax=1)
+                ax12.imshow(target[0][0], cmap=plt.cm.rainbow, vmin=0, vmax=1)
                 # plt.show()
                 canvas.draw()       # draw the canvas, cache the renderer
 
@@ -166,7 +170,7 @@ class Evaler(object):
                 X = np.asarray(buf)[:, :, (2,1,0)]
 
                 cv2.imshow('AAA',X)
-                k = cv2.waitKey(0) & 0xff
+                k = cv2.waitKey(1) & 0xff
                 if k == 27:
                     break
         cv2.destroyWindow('AAA')
@@ -186,8 +190,9 @@ class Evaler(object):
         image = torch.unsqueeze(imageRgb, 0).to(self.device)
         with torch.no_grad():
             outputs = model(image)
-            aaa = torch.sigmoid(outputs[0][0][1])
-            bbb = torch.sigmoid(outputs[0][0][0])
+            aaa = torch.sigmoid(outputs[0][0])
+            aaa = aaa.clamp(0.9,1)
+            bbb = torch.sigmoid(outputs[0][0])
             plt.subplot(211)
             plt.imshow(aaa, cmap=plt.cm.hot, vmin=torch.min(
                 aaa), vmax=torch.max(aaa))
@@ -218,6 +223,6 @@ if __name__ == '__main__':
         args.device = "cpu"
 
     evaler = Evaler(args)
-    evaler.eval()
-    # evaler.evalOnSingleImage(r"D:\tusimple\train_set\clips\0601\1494452439568910656\2.jpg")
+    # evaler.eval()
+    evaler.evalOnSingleImage(r"C:\Users\yuan\Desktop\11.jpg")
     torch.cuda.empty_cache()
