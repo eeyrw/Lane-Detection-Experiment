@@ -259,7 +259,7 @@ class Trainer(object):
 
             with torch.no_grad():
                 outputs = model(image)
-            self.metric.update(outputs[0], target)
+            self.metric.update(outputs[0], target[0])
             pixAcc, mIoU = self.metric.get()
             logger.info("Sample: {:d}, Validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
                 i + 1, pixAcc, mIoU))
