@@ -22,7 +22,11 @@ import torch.backends.cudnn as cudnn
 import time
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
-
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import matplotlib.gridspec as gridspec
+import matplotlib
+import light.data.sync_transforms as pairedTr
 
 
 # # 定义 transforms
@@ -96,22 +100,28 @@ class Evaler(object):
         self.args = args
         self.device = torch.device(args.device)
 
-        # image transform
-        self.transformForImage = transforms.Compose([
-            transforms.RandomResizedCrop((256, 512), scale=(0.8, 1.0), ratio=(2/1, 2/1)),
-            transforms.ToTensor(),
-            transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+        transFormsForAll_val = pairedTr.Compose([
+            pairedTr.RandomResizedCrop(
+                (256, 512), scale=(0.8, 1.0), ratio=(2/1, 2/1)),
         ])
 
-        data_kwargs = {'transformForImage': self.transformForImage,
-                       'rootDir': args.rootDir, 
-                       'requireRawImage': True
-                       #'resizeAndCropTo':(512,256)
+        transFormsForImage_val = pairedTr.Compose([
+            pairedTr.ToTensor(),
+            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+
+        transFormsForSeg_val = None
+
+        data_kwargs = {'transformForAll': transFormsForAll_val,
+                    'transformForImage': transFormsForImage_val,
+                    'transformForSeg': transFormsForSeg_val,
+                       'requireRawImage': True,
+                       'rootDir': args.rootDir
                        }
         valset = get_segmentation_dataset(
-            args.dataset, split='test8_night', **data_kwargs)
+            args.dataset, split='test', **data_kwargs)
         self.val_loader = data.DataLoader(dataset=valset,
-                                          shuffle=True,
+                                          # shuffle=True,
                                           num_workers=args.workers,
                                           pin_memory=True)
 
@@ -129,6 +139,41 @@ class Evaler(object):
                 self.model.load_state_dict(torch.load(
                     args.resume, map_location=lambda storage, loc: storage))
 
+    def visualizeImageAndLabel(self, image, label, output):
+        maxVal = torch.max(image)
+        minVal = torch.min(image)
+        imageNormalized = (image-minVal)/(maxVal-minVal)
+        maxVal = torch.max(label)
+        minVal = torch.min(label)
+        labelNormalized = (label.float()-minVal)/(maxVal-minVal)
+        maxVal = torch.max(output)
+        minVal = torch.min(output)
+        outputNormalized = (output.float()-minVal)/(maxVal-minVal)
+        outputNormalized = outputNormalized.detach()
+    
+        fig2 = plt.figure(constrained_layout=True, figsize=[9, 8], dpi=100)
+        canvas = FigureCanvas(fig2)
+
+        spec2 = gridspec.GridSpec(ncols=1, nrows=2, figure=fig2)
+        f2_ax1 = fig2.add_subplot(spec2[0, 0])
+        f2_ax2 = fig2.add_subplot(spec2[1, 0])
+
+        imageNormalized = imageNormalized.permute(1, 2, 0) # CHW to HWC
+
+        f2_ax1.set_title("Predict")
+        f2_ax1.imshow(imageNormalized, interpolation='bilinear')
+        f2_ax1.imshow(outputNormalized[0], alpha=outputNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        f2_ax2.set_title("Ground Truth")
+        f2_ax2.imshow(imageNormalized, interpolation='bilinear')
+        f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        canvas.draw()       # draw the canvas, cache the renderer
+        plt.close(fig2)
+
+        buf = canvas.buffer_rgba()
+        # ... convert to a NumPy array ...
+        X = np.asarray(buf)[:, :, (2,1,0)]
+        return X  
+
     def eval(self):
         if self.args.distributed:
             model = self.model.module
@@ -141,33 +186,7 @@ class Evaler(object):
             # target = target.to(self.device)
             with torch.no_grad():
                 outputs = model(image)
-                aaa = torch.sigmoid(outputs[0][0])
-                bbb = torch.sigmoid(outputs[0][0])
-
-                fig = Figure(figsize=(16, 9))
-                fig.tight_layout()
-                canvas = FigureCanvas(fig)
-
-                # Do some plotting.
-                ax11 = fig.add_subplot(221)
-                ax12 = fig.add_subplot(222)
-                ax2 = fig.add_subplot(212)
-
-                # plt.subplot(221)
-                ax11.imshow(aaa, cmap=plt.cm.rainbow, vmin=0, vmax=1)
-                # plt.subplot(212)
-                # rawImage = cv2.imread(rawImageFile[0])[..., ::-1]
-                ax2.imshow(image[0][0])
-                ax2.imshow(aaa, alpha=aaa,cmap=plt.cm.rainbow, vmin=0, vmax=1)
-                print('Current Image Path: %s' % rawImageFile)
-                # plt.subplot(222)
-                ax12.imshow(target[0][0], cmap=plt.cm.rainbow, vmin=0, vmax=1)
-                # plt.show()
-                canvas.draw()       # draw the canvas, cache the renderer
-
-                buf = canvas.buffer_rgba()
-                # ... convert to a NumPy array ...
-                X = np.asarray(buf)[:, :, (2,1,0)]
+                X=self.visualizeImageAndLabel(image[0],target[0],torch.sigmoid(outputs[0]))
 
                 cv2.imshow('AAA',X)
                 k = cv2.waitKey(1) & 0xff
@@ -191,9 +210,10 @@ class Evaler(object):
         with torch.no_grad():
             outputs = model(image)
             aaa = torch.sigmoid(outputs[0][0])
-            aaa = aaa.clamp(0.9,1)
+            aaa = aaa.clamp(0.8,1)
             bbb = torch.sigmoid(outputs[0][0])
             plt.subplot(211)
+            plt.imshow(image[0][0], cmap=plt.cm.rainbow, vmin=0, vmax=1)
             plt.imshow(aaa, cmap=plt.cm.hot, vmin=torch.min(
                 aaa), vmax=torch.max(aaa))
             # plt.subplot(222)
@@ -223,6 +243,6 @@ if __name__ == '__main__':
         args.device = "cpu"
 
     evaler = Evaler(args)
-    # evaler.eval()
-    evaler.evalOnSingleImage(r"C:\Users\yuan\Desktop\11.jpg")
+    evaler.eval()
+    # evaler.evalOnSingleImage(r"D:\cityscapes\leftImg8bit\train\dusseldorf\dusseldorf_000134_000019_leftImg8bit.png")
     torch.cuda.empty_cache()

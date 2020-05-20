@@ -233,7 +233,7 @@ class Trainer(object):
                 self.model.train()
 
             if iteration % checkDsPerIters == 0 or iteration == 1:
-                self.visualizeImageAndLabel(writer, iteration,images[0], targets[0],torch.sigmoid(outputs[0]))
+                self.visualizeImageAndLabel(writer, iteration,images[0].cpu(), targets[0].cpu(),torch.sigmoid(outputs[0]).cpu())
 
         save_checkpoint(self.model, self.args, is_best=False)
         total_training_time = time.time() - start_time
