@@ -27,6 +27,9 @@ from DiceLoss import BatchSoftDiceLoss
 from DiceLoss import BatchSoftBinaryDiceLoss
 from torch.utils.tensorboard import SummaryWriter
 import light.data.sync_transforms as pairedTr
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import matplotlib.gridspec as gridspec
 
 
 class Trainer(object):
@@ -156,9 +159,24 @@ class Trainer(object):
         maxVal = torch.max(output)
         minVal = torch.min(output)
         outputNormalized = (output.float()-minVal)/(maxVal-minVal)
-        writer.add_image('DsInspect/In',imageNormalized, 0, dataformats='CHW')
-        writer.add_images('DsInspect/Label_Out', torch.stack((labelNormalized,outputNormalized)), 0, dataformats='NCHW')
+        # writer.add_image('DsInspect/In',imageNormalized, 0, dataformats='CHW')
+        # writer.add_images('DsInspect/Label_Out', torch.stack((labelNormalized,outputNormalized)), 0, dataformats='NCHW')
         # writer.add_image('DsInspect/Out', outputNormalized.unsqueeze(0), 0, dataformats='CHW')
+        fig2 = plt.figure(constrained_layout=True, figsize=[9, 8], dpi=100)
+
+        spec2 = gridspec.GridSpec(ncols=1, nrows=2, figure=fig2)
+        f2_ax1 = fig2.add_subplot(spec2[0, 0])
+        f2_ax2 = fig2.add_subplot(spec2[1, 0])
+
+        image = torch.transpose(image, 0, 2) # CHW to HWC
+
+        f2_ax1.set_title("Predict")
+        f2_ax1.imshow(image, interpolation='bilinear')
+        f2_ax1.imshow(outputNormalized, alpha=outputNormalized,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        f2_ax2.set_title("Ground Truth")
+        f2_ax2.imshow(image, interpolation='bilinear')
+        f2_ax2.imshow(labelNormalized, alpha=labelNormalized,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        writer.add_figure('Predict Inspector', fig2, global_step=None, close=True, walltime=None)
 
 
     def train(self):
