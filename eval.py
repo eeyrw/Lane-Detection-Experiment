@@ -100,21 +100,21 @@ class Evaler(object):
         self.args = args
         self.device = torch.device(args.device)
 
-        transFormsForAll_val = pairedTr.Compose([
+        self.transFormsForAll_val = pairedTr.Compose([
             pairedTr.RandomResizedCrop(
                 (256, 512), scale=(0.8, 1.0), ratio=(2/1, 2/1)),
         ])
 
-        transFormsForImage_val = pairedTr.Compose([
+        self.transFormsForImage_val = pairedTr.Compose([
             pairedTr.ToTensor(),
             pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
         ])
 
-        transFormsForSeg_val = None
+        self.transFormsForSeg_val = None
 
-        data_kwargs = {'transformForAll': transFormsForAll_val,
-                    'transformForImage': transFormsForImage_val,
-                    'transformForSeg': transFormsForSeg_val,
+        data_kwargs = {'transformForAll': self.transFormsForAll_val,
+                    'transformForImage': self.transFormsForImage_val,
+                    'transformForSeg': self.transFormsForSeg_val,
                        'requireRawImage': True,
                        'rootDir': args.rootDir
                        }
@@ -183,7 +183,7 @@ class Evaler(object):
         model.eval()
         for image, target, rawImageFile in self.val_loader:
             image = image.to(self.device)
-            # target = target.to(self.device)
+            target = target.to(self.device)
             with torch.no_grad():
                 outputs = model(image)
                 X=self.visualizeImageAndLabel(image[0],target[0],torch.sigmoid(outputs[0]))
@@ -204,25 +204,15 @@ class Evaler(object):
         model.eval()
         imageFile = imagePath
         rawImageRgb = Image.open(imageFile).convert('RGB')
-        imageRgb = self.transformForImage(rawImageRgb)
-        rawImage = torch.unsqueeze(transforms.ToTensor()(rawImageRgb), 0)
+    
+        imageRgb = self.transFormsForImage_val(self.transFormsForAll_val(rawImageRgb))
         image = torch.unsqueeze(imageRgb, 0).to(self.device)
         with torch.no_grad():
             outputs = model(image)
-            aaa = torch.sigmoid(outputs[0][0])
-            aaa = aaa.clamp(0.8,1)
-            bbb = torch.sigmoid(outputs[0][0])
-            plt.subplot(211)
-            plt.imshow(image[0][0], cmap=plt.cm.rainbow, vmin=0, vmax=1)
-            plt.imshow(aaa, cmap=plt.cm.hot, vmin=torch.min(
-                aaa), vmax=torch.max(aaa))
-            # plt.subplot(222)
-            # plt.imshow(target[0].numpy(), cmap=plt.cm.hot, vmin=0, vmax=1)
-            # plt.subplot(223)
-            # plt.imshow(image[0].permute(1,2,0))
-            plt.subplot(212)
-            plt.imshow(rawImage[0].permute(1, 2, 0))
-            plt.show()
+            X=self.visualizeImageAndLabel(image[0],torch.zeros_like(outputs[0]),torch.sigmoid(outputs[0]))
+            cv2.imshow('AAA',X)
+            k = cv2.waitKey(0) & 0xff
+        cv2.destroyWindow('AAA')
 
 
 if __name__ == '__main__':
@@ -243,6 +233,6 @@ if __name__ == '__main__':
         args.device = "cpu"
 
     evaler = Evaler(args)
-    evaler.eval()
-    # evaler.evalOnSingleImage(r"D:\cityscapes\leftImg8bit\train\dusseldorf\dusseldorf_000134_000019_leftImg8bit.png")
+    # evaler.eval()
+    evaler.evalOnSingleImage(r"D:\cityscapes\leftImg8bit\val\lindau\lindau_000013_000019_leftImg8bit.png")
     torch.cuda.empty_cache()
