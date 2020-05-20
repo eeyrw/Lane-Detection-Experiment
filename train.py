@@ -30,6 +30,7 @@ import light.data.sync_transforms as pairedTr
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.gridspec as gridspec
+import matplotlib
 
 
 class Trainer(object):
@@ -149,7 +150,7 @@ class Trainer(object):
 
         self.best_pred = 0.0
 
-    def visualizeImageAndLabel(self, writer, image, label, output):
+    def visualizeImageAndLabel(self, writer, step, image, label, output):
         maxVal = torch.max(image)
         minVal = torch.min(image)
         imageNormalized = (image-minVal)/(maxVal-minVal)
@@ -159,6 +160,7 @@ class Trainer(object):
         maxVal = torch.max(output)
         minVal = torch.min(output)
         outputNormalized = (output.float()-minVal)/(maxVal-minVal)
+        outputNormalized = outputNormalized.detach()
         # writer.add_image('DsInspect/In',imageNormalized, 0, dataformats='CHW')
         # writer.add_images('DsInspect/Label_Out', torch.stack((labelNormalized,outputNormalized)), 0, dataformats='NCHW')
         # writer.add_image('DsInspect/Out', outputNormalized.unsqueeze(0), 0, dataformats='CHW')
@@ -168,15 +170,15 @@ class Trainer(object):
         f2_ax1 = fig2.add_subplot(spec2[0, 0])
         f2_ax2 = fig2.add_subplot(spec2[1, 0])
 
-        image = torch.transpose(image, 0, 2) # CHW to HWC
+        imageNormalized = imageNormalized.permute(1, 2, 0) # CHW to HWC
 
         f2_ax1.set_title("Predict")
-        f2_ax1.imshow(image, interpolation='bilinear')
-        f2_ax1.imshow(outputNormalized, alpha=outputNormalized,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        f2_ax1.imshow(imageNormalized, interpolation='bilinear')
+        f2_ax1.imshow(outputNormalized[0], alpha=outputNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
         f2_ax2.set_title("Ground Truth")
-        f2_ax2.imshow(image, interpolation='bilinear')
-        f2_ax2.imshow(labelNormalized, alpha=labelNormalized,cmap=plt.cm.rainbow, vmin=0, vmax=1)
-        writer.add_figure('Predict Inspector', fig2, global_step=None, close=True, walltime=None)
+        f2_ax2.imshow(imageNormalized, interpolation='bilinear')
+        f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        writer.add_figure('Predict Inspector', fig2, global_step=step, close=True, walltime=None)
 
 
     def train(self):
@@ -185,7 +187,7 @@ class Trainer(object):
         log_per_iters, val_per_iters = self.args.log_iter, self.args.val_epoch * \
             self.args.iters_per_epoch
 
-        checkDsPerIters = 1000
+        checkDsPerIters = 100
         save_per_iters = self.args.save_epoch * self.args.iters_per_epoch
         start_time = time.time()
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
@@ -231,7 +233,7 @@ class Trainer(object):
                 self.model.train()
 
             if iteration % checkDsPerIters == 0 or iteration == 1:
-                self.visualizeImageAndLabel(writer, images[0], targets[0],torch.sigmoid(outputs[0]))
+                self.visualizeImageAndLabel(writer, iteration,images[0], targets[0],torch.sigmoid(outputs[0]))
 
         save_checkpoint(self.model, self.args, is_best=False)
         total_training_time = time.time() - start_time
