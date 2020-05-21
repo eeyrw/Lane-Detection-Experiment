@@ -151,6 +151,7 @@ class Trainer(object):
         self.metric = SegmentationMetric(trainset.num_class)
 
         self.best_pred = 0.0
+        self.best_val_loss = 1000000
 
     def visualizeImageAndLabel(self, writer, step, image, label, output):
         maxVal = torch.max(image)
@@ -242,8 +243,8 @@ class Trainer(object):
                 save_checkpoint(self.model, self.args, is_best=False)
 
             if not self.args.skip_val and iteration % val_per_iters == 0:
-                mIoU = self.validation()
-                writer.add_scalar('mIoU/val', mIoU, iteration)
+                val_loss = self.validation()
+                writer.add_scalar('Loss/val', val_loss, iteration)
                 self.model.train()
 
             if iteration % checkDsPerIters == 0 or iteration == 1:
@@ -268,24 +269,30 @@ class Trainer(object):
             model = self.model
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
+        lossList=[]
         for i, (image, target) in enumerate(self.val_loader):
             image = image.to(self.device)
             target = target.to(self.device)
 
             with torch.no_grad():
-                outputs = model(image)
-            self.metric.update(outputs[0], target[0])
-            pixAcc, mIoU = self.metric.get()
-            logger.info("Sample: {:d}, Validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
-                i + 1, pixAcc, mIoU))
+                output = model(image)
+                losses = self.criterion(output, target)
+                lossList.append(losses)
+            # self.metric.update(outputs[0], target[0])
+            # pixAcc, mIoU = self.metric.get()
+            # logger.info("Sample: {:d}, Validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
+            #    i + 1, pixAcc, mIoU))
+            logger.info("Sample: {:d}, loss: {:.8f}".format(
+                i + 1, losses))
 
-        new_pred = (pixAcc + mIoU) / 2
-        if new_pred > self.best_pred:
+        # new_pred = (pixAcc + mIoU) / 2
+        new_val_loss = torch.Tensor(lossList).mean()
+        if new_val_loss < self.best_val_loss:
             is_best = True
-            self.best_pred = new_pred
+            self.best_val_loss = new_val_loss
         save_checkpoint(self.model, self.args, is_best)
         synchronize()
-        return mIoU
+        return new_val_loss
 
 
 def save_checkpoint(model, args, is_best=False):
