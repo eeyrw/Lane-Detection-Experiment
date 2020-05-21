@@ -2,6 +2,7 @@
 import datetime
 import argparse
 
+
 def str2bool(v):
     """ Usage:
     parser.add_argument('--pretrained', type=str2bool, nargs='?', const=True,
@@ -13,6 +14,7 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Unsupported value encountered.')
+
 
 def getParameter(bypassArgs=None):
     parser = argparse.ArgumentParser(description='Lane Detection Experiment')
@@ -72,6 +74,10 @@ def getParameter(bypassArgs=None):
                         help='skip validation during training')
     parser.add_argument('--val-epoch', type=int, default=1,
                         help='run validation every val-epoch')
+
+    # experiment
+    parser.add_argument('--exprName', type=str, default='defaultExpr',
+                        help='experiment name (default: defaultExpr)')
     if bypassArgs:
         args = parser.parse_args(bypassArgs)
     else:

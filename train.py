@@ -37,6 +37,7 @@ class Trainer(object):
     def __init__(self, args):
         self.args = args
         self.device = torch.device(args.device)
+        self.experimentName = args.exprName
 
         # image transform for train
         transFormsForAll = pairedTr.Compose([
@@ -123,7 +124,8 @@ class Trainer(object):
         #   args.aux, args.aux_weight, ignore_index=-1).to(self.device)
         # self.criterion = SoftDiceLoss().to(self.device)
         # self.criterion = BatchSoftDiceLoss().to(self.device)
-        self.criterion = torch.nn.BCEWithLogitsLoss(reduction='mean',pos_weight=torch.tensor([20])).to(self.device)
+        self.criterion = torch.nn.BCEWithLogitsLoss(
+            reduction='mean', pos_weight=torch.tensor([20])).to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
@@ -170,18 +172,29 @@ class Trainer(object):
         f2_ax1 = fig2.add_subplot(spec2[0, 0])
         f2_ax2 = fig2.add_subplot(spec2[1, 0])
 
-        imageNormalized = imageNormalized.permute(1, 2, 0) # CHW to HWC
+        imageNormalized = imageNormalized.permute(1, 2, 0)  # CHW to HWC
 
         f2_ax1.set_title("Predict")
         f2_ax1.imshow(imageNormalized, interpolation='bilinear')
-        f2_ax1.imshow(outputNormalized[0], alpha=outputNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        f2_ax1.imshow(outputNormalized[0], alpha=outputNormalized[0]
+                      * 0.7, cmap=plt.cm.rainbow, vmin=0, vmax=1)
         f2_ax2.set_title("Ground Truth")
         f2_ax2.imshow(imageNormalized, interpolation='bilinear')
-        f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
-        writer.add_figure('Predict Inspector', fig2, global_step=step, close=True, walltime=None)
-
+        f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]
+                      * 0.7, cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        writer.add_figure('Predict Inspector', fig2,
+                          global_step=step, close=True, walltime=None)
 
     def train(self):
+        global logger
+        self.experimentStartTime = time.strftime(
+            '%Y.%m.%d.%H.%M.%S', time.localtime(time.time()))
+        logger = setup_logger(args.model, args.log_dir, get_rank(), filename='{}_{}_log_{}-{}.txt'.format(
+            args.model, args.dataset, self.experimentName, self.experimentStartTime))
+
+        logger.info("Using {} GPUs".format(num_gpus))
+        logger.info(args)
+
         save_to_disk = get_rank() == 0
         epochs, max_iters = self.args.epochs, self.args.max_iters
         log_per_iters, val_per_iters = self.args.log_iter, self.args.val_epoch * \
@@ -190,9 +203,11 @@ class Trainer(object):
         checkDsPerIters = 100
         save_per_iters = self.args.save_epoch * self.args.iters_per_epoch
         start_time = time.time()
+
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
             epochs, max_iters))
-        writer = SummaryWriter()
+        writer = SummaryWriter(comment='%s-%s' %
+                               (self.experimentName, self.experimentStartTime))
 
         self.model.train()
         for iteration, (images, targets) in enumerate(self.train_loader):
@@ -203,7 +218,6 @@ class Trainer(object):
 
             outputs = self.model(images)
             losses = self.criterion(outputs, targets)
-
 
             self.optimizer.zero_grad()
             losses.backward()
@@ -233,7 +247,8 @@ class Trainer(object):
                 self.model.train()
 
             if iteration % checkDsPerIters == 0 or iteration == 1:
-                self.visualizeImageAndLabel(writer, iteration,images[0].cpu(), targets[0].cpu(),torch.sigmoid(outputs[0]).cpu())
+                self.visualizeImageAndLabel(writer, iteration, images[0].cpu(
+                ), targets[0].cpu(), torch.sigmoid(outputs[0]).cpu())
 
         save_checkpoint(self.model, self.args, is_best=False)
         total_training_time = time.time() - start_time
@@ -278,14 +293,16 @@ def save_checkpoint(model, args, is_best=False):
     directory = os.path.expanduser(args.save_dir)
     if not os.path.exists(directory):
         os.makedirs(directory)
-    filename = '{}_{}.pth'.format(args.model, args.dataset)
+    filename = '{}_{}_{}-{}.pth'.format(args.model, args.dataset,
+                                        self.experimentName, self.experimentStartTime)
     filename = os.path.join(directory, filename)
 
     if args.distributed:
         model = model.module
     torch.save(model.state_dict(), filename)
     if is_best:
-        best_filename = '{}_{}_best_model.pth'.format(args.model, args.dataset)
+        best_filename = '{}_{}_best_model_{}-{}_.pth'.format(
+            args.model, args.dataset, self.experimentName, self.experimentStartTime)
         best_filename = os.path.join(directory, best_filename)
         shutil.copyfile(filename, best_filename)
 
@@ -312,11 +329,6 @@ if __name__ == '__main__':
             backend="nccl", init_method="env://")
         synchronize()
     args.lr = args.lr * num_gpus
-
-    logger = setup_logger(args.model, args.log_dir, get_rank(), filename='{}_{}_log.txt'.format(
-        args.model, args.dataset))
-    logger.info("Using {} GPUs".format(num_gpus))
-    logger.info(args)
 
     trainer = Trainer(args)
     trainer.train()
