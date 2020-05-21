@@ -269,7 +269,7 @@ class Trainer(object):
             model = self.model
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
-        lossList=[]
+        lossList = []
         for i, (image, target) in enumerate(self.val_loader):
             image = image.to(self.device)
             target = target.to(self.device)
@@ -290,18 +290,19 @@ class Trainer(object):
         if new_val_loss < self.best_val_loss:
             is_best = True
             self.best_val_loss = new_val_loss
-        save_checkpoint(self.model, self.args, is_best)
+        save_checkpoint(self.model, self.args, self.experimentName,
+                        self.experimentStartTime, is_best)
         synchronize()
         return new_val_loss
 
 
-def save_checkpoint(model, args, is_best=False):
+def save_checkpoint(model, args, experimentName, experimentStartTime, is_best=False):
     """Save Checkpoint"""
     directory = os.path.expanduser(args.save_dir)
     if not os.path.exists(directory):
         os.makedirs(directory)
     filename = '{}_{}_{}-{}.pth'.format(args.model, args.dataset,
-                                        self.experimentName, self.experimentStartTime)
+                                        experimentName, experimentStartTime)
     filename = os.path.join(directory, filename)
 
     if args.distributed:
@@ -309,7 +310,7 @@ def save_checkpoint(model, args, is_best=False):
     torch.save(model.state_dict(), filename)
     if is_best:
         best_filename = '{}_{}_best_model_{}-{}_.pth'.format(
-            args.model, args.dataset, self.experimentName, self.experimentStartTime)
+            args.model, args.dataset, experimentName, experimentStartTime)
         best_filename = os.path.join(directory, best_filename)
         shutil.copyfile(filename, best_filename)
 
