@@ -251,7 +251,8 @@ class Trainer(object):
                 self.visualizeImageAndLabel(writer, iteration, images[0].cpu(
                 ), targets[0].cpu(), torch.sigmoid(outputs[0]).cpu())
 
-        save_checkpoint(self.model, self.args, is_best=False)
+        save_checkpoint(self.model, self.args, self.experimentName,
+                        self.experimentStartTime, is_best=False)
         total_training_time = time.time() - start_time
         total_training_str = str(
             datetime.timedelta(seconds=total_training_time))
