@@ -206,7 +206,7 @@ class Trainer(object):
 
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
             epochs, max_iters))
-        writer = SummaryWriter(comment='%s-%s' %
+        writer = SummaryWriter(comment='-%s-%s' %
                                (self.experimentName, self.experimentStartTime))
 
         self.model.train()
