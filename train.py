@@ -240,7 +240,8 @@ class Trainer(object):
                                   self.optimizer.param_groups[0]['lr'], iteration)
 
             if iteration % save_per_iters == 0 and save_to_disk:
-                save_checkpoint(self.model, self.args, is_best=False)
+                save_checkpoint(self.model, self.args,  self.experimentName,
+                                self.experimentStartTime, is_best=False)
 
             if not self.args.skip_val and iteration % val_per_iters == 0:
                 val_loss = self.validation()
