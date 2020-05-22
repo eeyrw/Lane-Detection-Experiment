@@ -119,7 +119,7 @@ class Evaler(object):
                        'rootDir': args.rootDir
                        }
         valset = get_segmentation_dataset(
-            args.dataset, split='test', **data_kwargs)
+            args.dataset, split='test1_crowd', **data_kwargs)
         self.val_loader = data.DataLoader(dataset=valset,
                                           # shuffle=True,
                                           num_workers=args.workers,
@@ -214,6 +214,41 @@ class Evaler(object):
             k = cv2.waitKey(0) & 0xff
         cv2.destroyWindow('AAA')
 
+    
+    def evalOnVideo(self):
+        videos=[r"C:\Users\yuan\Documents\研究生课题\LDW Research\highway45.mp4",
+            r"C:\Users\yuan\Documents\研究生课题\LDW Research\Mitsubishi Evo VIII MR - Forza Horizon 4 _ Logitech g29 gameplay.mp4",
+        r"C:\Users\yuan\Desktop\lane-detector-master\REC073.mp4",
+        r"C:\Users\yuan\Documents\研究生课题\drivingVideo.mp4",
+        r"C:\Users\yuan\Documents\研究生课题\pikes peak.mp4",
+        r"E:\Lane Dataset\Jiqing Expressway Video\IMG_0304.MOV"
+        ]
+        # The video feed is read in as a VideoCapture object
+
+        if self.args.distributed:
+            model = self.model.module
+        else:
+            model = self.model
+        torch.cuda.empty_cache()  # TODO check if it helps
+        model.eval()
+        cap = cv2.VideoCapture(videos[5])
+        while (cap.isOpened()):
+            # ret = a boolean return value from getting the frame, frame = the current frame being projected in the video
+            for i in range(30):
+                ret, frame = cap.read()
+            imageRgb = self.transFormsForImage_val(self.transFormsForAll_val(Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))))
+            image = torch.unsqueeze(imageRgb, 0).to(self.device)
+            with torch.no_grad():
+                outputs = model(image)
+                X=self.visualizeImageAndLabel(image[0],torch.zeros_like(outputs[0]),torch.sigmoid(outputs[0]))
+                cv2.imshow('AAA',X)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        # The following frees up resources and closes all windows
+        cap.release()
+        cv2.destroyAllWindows()
+
+
 
 if __name__ == '__main__':
 
@@ -232,7 +267,9 @@ if __name__ == '__main__':
         args.distributed = False
         args.device = "cpu"
 
+    args.resume='erfnet_culane_exprTest-2020.05.21.15.24.24.pth'
     evaler = Evaler(args)
     # evaler.eval()
-    evaler.evalOnSingleImage(r"D:\cityscapes\leftImg8bit\val\lindau\lindau_000013_000019_leftImg8bit.png")
+    # evaler.evalOnSingleImage(r"D:\cityscapes\leftImg8bit\val\lindau\lindau_000013_000019_leftImg8bit.png")
+    evaler.evalOnVideo()
     torch.cuda.empty_cache()

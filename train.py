@@ -311,7 +311,7 @@ def save_checkpoint(model, args, experimentName, experimentStartTime, is_best=Fa
         model = model.module
     torch.save(model.state_dict(), filename)
     if is_best:
-        best_filename = '{}_{}_best_model_{}-{}_.pth'.format(
+        best_filename = '{}_{}_best_model_{}-{}.pth'.format(
             args.model, args.dataset, experimentName, experimentStartTime)
         best_filename = os.path.join(directory, best_filename)
         shutil.copyfile(filename, best_filename)
