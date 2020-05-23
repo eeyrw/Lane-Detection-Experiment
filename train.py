@@ -153,7 +153,7 @@ class Trainer(object):
         self.best_pred = 0.0
         self.best_val_loss = 1000000
 
-    def visualizeImageAndLabel(self, writer, step, image, label, output):
+    def visualizeImageAndLabel(self, writer, tag, step, image, label, output):
         maxVal = torch.max(image)
         minVal = torch.min(image)
         imageNormalized = (image-minVal)/(maxVal-minVal)
@@ -183,7 +183,7 @@ class Trainer(object):
         f2_ax2.imshow(imageNormalized, interpolation='bilinear')
         f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]
                       * 0.7, cmap=plt.cm.rainbow, vmin=0, vmax=1)
-        writer.add_figure('Predict Inspector', fig2,
+        writer.add_figure(tag, fig2,
                           global_step=step, close=True, walltime=None)
 
     def train(self):
@@ -244,12 +244,12 @@ class Trainer(object):
                                 self.experimentStartTime, is_best=False)
 
             if not self.args.skip_val and iteration % val_per_iters == 0:
-                val_loss = self.validation()
+                val_loss = self.validation(writer, iteration)
                 writer.add_scalar('Loss/val', val_loss, iteration)
                 self.model.train()
 
             if iteration % checkDsPerIters == 0 or iteration == 1:
-                self.visualizeImageAndLabel(writer, iteration, images[0].cpu(
+                self.visualizeImageAndLabel(writer, 'TrainSamples', iteration, images[0].cpu(
                 ), targets[0].cpu(), torch.sigmoid(outputs[0]).cpu())
 
         save_checkpoint(self.model, self.args, self.experimentName,
@@ -261,7 +261,7 @@ class Trainer(object):
             "Total training time: {} ({:.4f}s / it)".format(
                 total_training_str, total_training_time / max_iters))
 
-    def validation(self):
+    def validation(self, writer, iteration):
         # total_inter, total_union, total_correct, total_label = 0, 0, 0, 0
         is_best = False
         self.metric.reset()
@@ -286,6 +286,10 @@ class Trainer(object):
             #    i + 1, pixAcc, mIoU))
             logger.info("Sample: {:d}, loss: {:.8f}".format(
                 i + 1, losses))
+
+            if i == 0:
+                self.visualizeImageAndLabel(writer, 'ValidationSamples', iteration, image[0].cpu(
+                ), target[0].cpu(), torch.sigmoid(output[0]).cpu())
 
         # new_pred = (pixAcc + mIoU) / 2
         new_val_loss = torch.Tensor(lossList).mean()
