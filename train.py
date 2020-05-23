@@ -133,12 +133,14 @@ class Trainer(object):
                                          momentum=args.momentum,
                                          weight_decay=args.weight_decay)
         # lr scheduling
-        self.lr_scheduler = WarmupPolyLR(self.optimizer,
-                                         max_iters=args.max_iters,
-                                         power=0.9,
-                                         warmup_factor=args.warmup_factor,
-                                         warmup_iters=args.warmup_iters,
-                                         warmup_method=args.warmup_method)
+        # self.lr_scheduler = WarmupPolyLR(self.optimizer,
+        #                                  max_iters=args.max_iters,
+        #                                  power=0.9,
+        #                                  warmup_factor=args.warmup_factor,
+        #                                  warmup_iters=args.warmup_iters,
+        #                                  warmup_method=args.warmup_method)
+
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, args.step_size, gamma=0.1, last_epoch=-1)
 
         if args.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,

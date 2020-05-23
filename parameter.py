@@ -58,6 +58,8 @@ def getParameter(bypassArgs=None):
                         help='lr = warmup_factor * lr')
     parser.add_argument('--warmup-method', type=str, default='linear',
                         help='method of warmup')
+    parser.add_argument('--step-size', type=int, default=10000,
+                        help='multistep lr step size')                        
     # cuda setting
     parser.add_argument('--cuda_usage', type=str2bool, nargs='?', default=False,
                         dest='cuda_usage', help='Whether to use CUDA.')
