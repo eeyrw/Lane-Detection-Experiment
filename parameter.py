@@ -29,6 +29,10 @@ def getParameter(bypassArgs=None):
                         help='base image size')
     parser.add_argument('--crop-size', type=int, default=768,
                         help='crop image size')
+    parser.add_argument('--crop-size-h', type=int, default=256,
+                        help='crop image size height')       
+    parser.add_argument('--crop-size-w', type=int, default=512,
+                        help='crop image size width')                                           
     parser.add_argument('--workers', '-j', type=int, default=4,
                         metavar='N', help='dataloader threads')
     # training hyper params

@@ -43,7 +43,7 @@ class Trainer(object):
         transFormsForAll = pairedTr.Compose([
             pairedTr.RandomPerspective(distortion_scale=0.3, p=0.2),
             pairedTr.RandomResizedCrop(
-                (256, 512), scale=(0.75, 1.0), ratio=(2/1, 2/1)),
+                (args.crop_size_h, args.crop_size_w), scale=(0.75, 1.0), ratio=(args.crop_size_w/args.crop_size_h, args.crop_size_w/args.crop_size_h)),
         ])
 
         transFormsForImage = pairedTr.Compose([
