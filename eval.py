@@ -102,7 +102,7 @@ class Evaler(object):
 
         self.transFormsForAll_val = pairedTr.Compose([
             pairedTr.RandomResizedCrop(
-                (256, 512), scale=(0.8, 1.0), ratio=(2/1, 2/1)),
+                (128, 256), scale=(0.9, 1.0), ratio=(2/1, 2/1)),
         ])
 
         self.transFormsForImage_val = pairedTr.Compose([
@@ -113,8 +113,8 @@ class Evaler(object):
         self.transFormsForSeg_val = None
 
         data_kwargs = {'transformForAll': self.transFormsForAll_val,
-                    'transformForImage': self.transFormsForImage_val,
-                    'transformForSeg': self.transFormsForSeg_val,
+                       'transformForImage': self.transFormsForImage_val,
+                       'transformForSeg': self.transFormsForSeg_val,
                        'requireRawImage': True,
                        'rootDir': args.rootDir
                        }
@@ -149,8 +149,8 @@ class Evaler(object):
         maxVal = torch.max(output)
         minVal = torch.min(output)
         outputNormalized = (output.float()-minVal)/(maxVal-minVal)
-        outputNormalized = outputNormalized.detach()
-    
+        outputNormalized = outputNormalized.detach() > 0.9
+
         fig2 = plt.figure(constrained_layout=True, figsize=[9, 8], dpi=100)
         canvas = FigureCanvas(fig2)
 
@@ -158,21 +158,23 @@ class Evaler(object):
         f2_ax1 = fig2.add_subplot(spec2[0, 0])
         f2_ax2 = fig2.add_subplot(spec2[1, 0])
 
-        imageNormalized = imageNormalized.permute(1, 2, 0) # CHW to HWC
+        imageNormalized = imageNormalized.permute(1, 2, 0)  # CHW to HWC
 
         f2_ax1.set_title("Predict")
         f2_ax1.imshow(imageNormalized, interpolation='bilinear')
-        f2_ax1.imshow(outputNormalized[0], alpha=outputNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        f2_ax1.imshow(outputNormalized[0], alpha=outputNormalized[0]
+                      * 0.7, cmap=plt.cm.rainbow, vmin=0, vmax=1)
         f2_ax2.set_title("Ground Truth")
         f2_ax2.imshow(imageNormalized, interpolation='bilinear')
-        f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]*0.7,cmap=plt.cm.rainbow, vmin=0, vmax=1)
+        f2_ax2.imshow(labelNormalized[0], alpha=labelNormalized[0]
+                      * 0.7, cmap=plt.cm.rainbow, vmin=0, vmax=1)
         canvas.draw()       # draw the canvas, cache the renderer
         plt.close(fig2)
 
         buf = canvas.buffer_rgba()
         # ... convert to a NumPy array ...
-        X = np.asarray(buf)[:, :, (2,1,0)]
-        return X  
+        X = np.asarray(buf)[:, :, (2, 1, 0)]
+        return X
 
     def eval(self):
         if self.args.distributed:
@@ -186,14 +188,14 @@ class Evaler(object):
             target = target.to(self.device)
             with torch.no_grad():
                 outputs = model(image)
-                X=self.visualizeImageAndLabel(image[0],target[0],torch.sigmoid(outputs[0]))
+                X = self.visualizeImageAndLabel(
+                    image[0], target[0], torch.sigmoid(outputs[0]))
 
-                cv2.imshow('AAA',X)
+                cv2.imshow('AAA', X)
                 k = cv2.waitKey(1) & 0xff
                 if k == 27:
                     break
         cv2.destroyWindow('AAA')
-
 
     def evalOnSingleImage(self, imagePath):
         if self.args.distributed:
@@ -204,25 +206,28 @@ class Evaler(object):
         model.eval()
         imageFile = imagePath
         rawImageRgb = Image.open(imageFile).convert('RGB')
-    
-        imageRgb = self.transFormsForImage_val(self.transFormsForAll_val(rawImageRgb))
+
+        imageRgb = self.transFormsForImage_val(
+            self.transFormsForAll_val(rawImageRgb))
         image = torch.unsqueeze(imageRgb, 0).to(self.device)
         with torch.no_grad():
             outputs = model(image)
-            X=self.visualizeImageAndLabel(image[0],torch.zeros_like(outputs[0]),torch.sigmoid(outputs[0]))
-            cv2.imshow('AAA',X)
+            X = self.visualizeImageAndLabel(image[0], torch.zeros_like(
+                outputs[0]), torch.sigmoid(outputs[0]))
+            cv2.imshow('AAA', X)
             k = cv2.waitKey(0) & 0xff
         cv2.destroyWindow('AAA')
 
-    
     def evalOnVideo(self):
-        videos=[r"C:\Users\yuan\Documents\研究生课题\LDW Research\highway45.mp4",
-            r"C:\Users\yuan\Documents\研究生课题\LDW Research\Mitsubishi Evo VIII MR - Forza Horizon 4 _ Logitech g29 gameplay.mp4",
-        r"C:\Users\yuan\Desktop\lane-detector-master\REC073.mp4",
-        r"C:\Users\yuan\Documents\研究生课题\drivingVideo.mp4",
-        r"C:\Users\yuan\Documents\研究生课题\pikes peak.mp4",
-        r"E:\Lane Dataset\Jiqing Expressway Video\IMG_0304.MOV"
-        ]
+        videos = [r"C:\Users\yuan\Documents\研究生课题\LDW Research\highway45.mp4",
+                  r"C:\Users\yuan\Documents\研究生课题\LDW Research\Mitsubishi Evo VIII MR - Forza Horizon 4 _ Logitech g29 gameplay.mp4",
+                  r"C:\Users\yuan\Desktop\lane-detector-master\REC073.mp4",
+                  r"C:\Users\yuan\Documents\研究生课题\drivingVideo.mp4",
+                  r"C:\Users\yuan\Documents\研究生课题\pikes peak.mp4",
+                  r"E:\Lane Dataset\Jiqing Expressway Video\IMG_0308.mov",
+                  r"E:\Lane Dataset\Jiqing Expressway Video\IMG_0253.mov",
+                  r"C:\Users\yuan\Desktop\QQ视频_c8a5486414df1c55787f097d6af685281590107727.mp4"
+                  ]
         # The video feed is read in as a VideoCapture object
 
         if self.args.distributed:
@@ -236,18 +241,20 @@ class Evaler(object):
             # ret = a boolean return value from getting the frame, frame = the current frame being projected in the video
             for i in range(30):
                 ret, frame = cap.read()
-            imageRgb = self.transFormsForImage_val(self.transFormsForAll_val(Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))))
+
+            imageRgb = self.transFormsForImage_val(self.transFormsForAll_val(
+                Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))))
             image = torch.unsqueeze(imageRgb, 0).to(self.device)
             with torch.no_grad():
                 outputs = model(image)
-                X=self.visualizeImageAndLabel(image[0],torch.zeros_like(outputs[0]),torch.sigmoid(outputs[0]))
-                cv2.imshow('AAA',X)
+                X = self.visualizeImageAndLabel(image[0], torch.zeros_like(
+                    outputs[0]), torch.sigmoid(outputs[0]))
+                cv2.imshow('AAA', X)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         # The following frees up resources and closes all windows
         cap.release()
         cv2.destroyAllWindows()
-
 
 
 if __name__ == '__main__':
@@ -267,9 +274,9 @@ if __name__ == '__main__':
         args.distributed = False
         args.device = "cpu"
 
-    args.resume='erfnet_culane_exprTest-2020.05.21.15.24.24.pth'
+    args.resume = 'erfnet_culane_best_model_lowRes-2020.05.23.12.52.56.pth '
     evaler = Evaler(args)
     # evaler.eval()
-    # evaler.evalOnSingleImage(r"D:\cityscapes\leftImg8bit\val\lindau\lindau_000013_000019_leftImg8bit.png")
+    # evaler.evalOnSingleImage(r"C:\Users\yuan\Desktop\1729271_100847675322_2.jpg")
     evaler.evalOnVideo()
     torch.cuda.empty_cache()
