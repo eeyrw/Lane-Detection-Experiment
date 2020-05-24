@@ -128,10 +128,14 @@ class Trainer(object):
             reduction='mean', pos_weight=torch.tensor([20])).to(self.device)
 
         # optimizer
-        self.optimizer = torch.optim.SGD(self.model.parameters(),
-                                         lr=args.lr,
-                                         momentum=args.momentum,
-                                         weight_decay=args.weight_decay)
+        # self.optimizer = torch.optim.SGD(self.model.parameters(),
+        #                                  lr=args.lr,
+        #                                  momentum=args.momentum,
+        #                                  weight_decay=args.weight_decay)
+        # optimizer
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr, betas=(
+            0.9, 0.999), eps=1e-08, weight_decay=args.weight_decay, amsgrad=False)
+
         # lr scheduling
         # self.lr_scheduler = WarmupPolyLR(self.optimizer,
         #                                  max_iters=args.max_iters,
@@ -140,7 +144,8 @@ class Trainer(object):
         #                                  warmup_iters=args.warmup_iters,
         #                                  warmup_method=args.warmup_method)
 
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, args.step_size, gamma=0.1, last_epoch=-1)
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(
+            self.optimizer, args.step_size, gamma=0.1, last_epoch=-1)
 
         if args.distributed:
             self.model = nn.parallel.DistributedDataParallel(self.model,
