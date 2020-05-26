@@ -34,15 +34,15 @@ class CLSTM_cell(nn.Module):
         height = inputs.shape[2]
         width = inputs.shape[3]
         if hidden_state is None:
-            hx = torch.zeros(channel, self.num_features, height,
+            hx = torch.zeros(1,channel, height,
                              width)
-            cx = torch.zeros(channel, self.num_features, height,
+            cx = torch.zeros(1,channel, height,
                              width)
         else:
             hx, cx = hidden_state
         output_inner = []
         for index in range(seq_len):
-            x = inputs[index, ...]
+            x = inputs[index, ...].unsqueeze(0)
 
             combined = torch.cat((x, hx), 1)
             gates = self.conv(combined)  # gates: S, num_features*4, H, W
@@ -59,7 +59,7 @@ class CLSTM_cell(nn.Module):
             output_inner.append(hy)
             hx = hy
             cx = cy
-        return torch.stack(output_inner), (hy, cy)
+        return torch.stack(output_inner).squeeze(1), (hy, cy)
 
 
 class DownsamplerBlock (nn.Module):
@@ -212,11 +212,9 @@ class ERFNetLstm(nn.Module):
         #inputs : [N,SEQ_LEN,C,H,W]
         batchOutputs = []
         for inputs in batchInputs:
-            intermidiateOutputs = torch.stack(
-                [self.encoder(input) for input in inputs])
+            intermidiateOutputs = self.encoder(inputs)
             intermidiateOutputs, _ = self.clstm(intermidiateOutputs)
-            outputs = [self.decoder.forward(
-                intermidiateOutput) for intermidiateOutput in intermidiateOutputs]
+            outputs = self.decoder.forward(intermidiateOutputs)
             batchOutputs.append(outputs)
         return torch.stack(batchOutputs)
 
@@ -233,4 +231,6 @@ def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models
 
 
 if __name__ == '__main__':
-    model = get_erfnet_lstm_seg()
+    model = ERFNetLstm(1)
+    batchInputs = torch.randn(2, 4, 3, 128, 256)
+    b = model(batchInputs)
