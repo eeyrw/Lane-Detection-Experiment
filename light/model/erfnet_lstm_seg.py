@@ -206,16 +206,19 @@ class ERFNetLstm(nn.Module):
         else:
             self.encoder = encoder
         self.decoder = Decoder(num_classes)
-        self.clstm = CLSTM_cell(128,3,128)
+        self.clstm = CLSTM_cell(128, 3, 128)
 
     def forward(self, batchInputs, only_encode=False):
         #inputs : [N,SEQ_LEN,C,H,W]
+        batchOutputs = []
         for inputs in batchInputs:
-            if only_encode:
-                return self.encoder.forward(input, predict=True)
-            else:
-                output = self.encoder(input)  # predict=False by default
-                return self.decoder.forward(output)
+            intermidiateOutputs = torch.stack(
+                [self.encoder(input) for input in inputs])
+            intermidiateOutputs, _ = self.clstm(intermidiateOutputs)
+            outputs = [self.decoder.forward(
+                intermidiateOutput) for intermidiateOutput in intermidiateOutputs]
+            batchOutputs.append(outputs)
+        return torch.stack(batchOutputs)
 
 
 def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models',
