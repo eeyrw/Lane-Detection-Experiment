@@ -231,7 +231,9 @@ def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models
 
 
 if __name__ == '__main__':
+    from torchviz import make_dot
     model = ERFNetLstm(1)
-    batchInputs = torch.randn(2, 4, 3, 128, 256)
+    batchInputs = torch.randn(2, 4, 3, 128, 256,dtype=torch.float, requires_grad=False)
     b = model(batchInputs)
+    make_dot(b).render("attached", format="png")
     print(b.size())
