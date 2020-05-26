@@ -13,10 +13,9 @@ class CLSTM_cell(nn.Module):
     """ConvLSTMCell
     """
 
-    def __init__(self, shape, input_channels, filter_size, num_features):
+    def __init__(self, input_channels, filter_size, num_features):
         super(CLSTM_cell, self).__init__()
 
-        self.shape = shape  # H, W
         self.input_channels = input_channels
         self.filter_size = filter_size
         self.num_features = num_features
@@ -28,22 +27,22 @@ class CLSTM_cell(nn.Module):
                       self.padding),
             nn.GroupNorm(4 * self.num_features // 32, 4 * self.num_features))
 
-    def forward(self, inputs=None, hidden_state=None, seq_len=10):
-        #  seq_len=10 for moving_mnist
+    def forward(self, inputs, hidden_state=None):
+        # inputs [N,C,H,W]
+        seq_len = inputs.shape[0]
+        channel = inputs.shape[1]
+        height = inputs.shape[2]
+        width = inputs.shape[3]
         if hidden_state is None:
-            hx = torch.zeros(inputs.size(1), self.num_features, self.shape[0],
-                             self.shape[1])
-            cx = torch.zeros(inputs.size(1), self.num_features, self.shape[0],
-                             self.shape[1])
+            hx = torch.zeros(channel, self.num_features, height,
+                             width)
+            cx = torch.zeros(channel, self.num_features, height,
+                             width)
         else:
             hx, cx = hidden_state
         output_inner = []
         for index in range(seq_len):
-            if inputs is None:
-                x = torch.zeros(hx.size(0), self.input_channels, self.shape[0],
-                                self.shape[1])
-            else:
-                x = inputs[index, ...]
+            x = inputs[index, ...]
 
             combined = torch.cat((x, hx), 1)
             gates = self.conv(combined)  # gates: S, num_features*4, H, W
@@ -207,13 +206,16 @@ class ERFNetLstm(nn.Module):
         else:
             self.encoder = encoder
         self.decoder = Decoder(num_classes)
+        self.clstm = CLSTM_cell(128,3,128)
 
-    def forward(self, input, only_encode=False):
-        if only_encode:
-            return self.encoder.forward(input, predict=True)
-        else:
-            output = self.encoder(input)  # predict=False by default
-            return self.decoder.forward(output)
+    def forward(self, batchInputs, only_encode=False):
+        #inputs : [N,SEQ_LEN,C,H,W]
+        for inputs in batchInputs:
+            if only_encode:
+                return self.encoder.forward(input, predict=True)
+            else:
+                output = self.encoder(input)  # predict=False by default
+                return self.decoder.forward(output)
 
 
 def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models',
