@@ -7,6 +7,7 @@ from .shufflenetv2_seg import *
 from .igcv3_seg import *
 from .efficientnet_seg import *
 from .erfnet_seg import *
+from .erfnet_lstm_seg import *
 
 
 def get_segmentation_model(model, **kwargs):
@@ -20,6 +21,7 @@ def get_segmentation_model(model, **kwargs):
         'igcv3': get_igcv3_seg,
         'efficientnet': get_efficientnet_seg,
         'erfnet': get_erfnet_seg,
+        'erfnet_lstm': get_erfnet_lstm_seg,
     }
     return models[model](**kwargs)
 

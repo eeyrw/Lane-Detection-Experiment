@@ -42,7 +42,7 @@ class CLSTM_cell(nn.Module):
             hx, cx = hidden_state
         output_inner = []
         for index in range(seq_len):
-            x = inputs[index, ...].unsqueeze(0)
+            x = inputs[index, ...].unsqueeze(0) # [C,H,W] to [1,C,H,W]
 
             combined = torch.cat((x, hx), 1)
             gates = self.conv(combined)  # gates: S, num_features*4, H, W
@@ -226,14 +226,14 @@ def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models
     if pretrained:
         from ..model import get_model_file
         model.load_state_dict(
-            torch.load(get_model_file('erfnet_%s_best_model' % dataset, root=root), map_location='cpu'))
+            torch.load(get_model_file('erfnet_lstm_%s_best_model' % dataset, root=root), map_location='cpu'))
     return model
 
 
 if __name__ == '__main__':
-    from torchviz import make_dot
+    # from torchviz import make_dot
     model = ERFNetLstm(1)
     batchInputs = torch.randn(2, 4, 3, 128, 256,dtype=torch.float, requires_grad=False)
     b = model(batchInputs)
-    make_dot(b).render("attached", format="png")
+    # make_dot(b).render("attached", format="png")
     print(b.size())

@@ -41,7 +41,7 @@ class Trainer(object):
 
         # image transform for train
         transFormsForAll = pairedTr.Compose([
-            pairedTr.RandomPerspective(distortion_scale=0.3, p=0.2),
+            pairedTr.RandomPerspective(distortion_scale=0.2, p=0.1),
             pairedTr.RandomResizedCrop(
                 (args.crop_size_h, args.crop_size_w), scale=(0.75, 1.0), ratio=(args.crop_size_w/args.crop_size_h, args.crop_size_w/args.crop_size_h)),
         ])
@@ -49,7 +49,7 @@ class Trainer(object):
         transFormsForImage = pairedTr.Compose([
             pairedTr.ColorJitter(0.3, 0.3, 0.3),
             pairedTr.ToTensor(),
-            pairedTr.RandomErasing(p=0.2),
+            pairedTr.RandomErasing(p=0.1),
             pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
         ])
 
@@ -73,11 +73,16 @@ class Trainer(object):
         data_kwargs = {'transformForAll': transFormsForAll,
                        'transformForImage': transFormsForImage,
                        'transformForSeg': transFormsForSeg,
-                       'rootDir': args.rootDir}
+                       'rootDir': args.rootDir,
+                       'mode': 'consecutive',
+                       'framesGroupSize': 10
+                       }
         data_kwargs_val = {'transformForAll': transFormsForAll_val,
                            'transformForImage': transFormsForImage_val,
                            'transformForSeg': transFormsForSeg_val,
-                           'rootDir': args.rootDir}
+                           'rootDir': args.rootDir,
+                           'mode': 'consecutive',
+                           'framesGroupSize': 10}
 
         trainset = get_segmentation_dataset(
             args.dataset, split='train', **data_kwargs)
@@ -329,6 +334,7 @@ if __name__ == '__main__':
 
     print(os.getcwd())
     args = getParameter()
+    args.model = 'erfnet_lstm'
 
     # reference maskrcnn-benchmark
     num_gpus = int(os.environ["WORLD_SIZE"]
