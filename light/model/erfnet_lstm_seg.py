@@ -234,3 +234,4 @@ if __name__ == '__main__':
     model = ERFNetLstm(1)
     batchInputs = torch.randn(2, 4, 3, 128, 256)
     b = model(batchInputs)
+    print(b.size())
