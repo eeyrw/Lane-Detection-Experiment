@@ -185,10 +185,10 @@ class CULaneDataset(Dataset):
         for _, clips in rawframesGroupDict.items():
             clipNum = len(clips)
             for i in range(0, clipNum, self.framesGroupSize):
-                if (i + self.framesGroupSize) <= len(clips):
+                if (i + self.framesGroupSize) <= clipNum:
                     framesGroupList.append(clips[i:i + self.framesGroupSize])
                 else:
-                    framesGroupList.append(clips[len(clips)-self.framesGroupSize:]) # Ensure every group have same length
+                    framesGroupList.append(clips[clipNum-self.framesGroupSize:]) # Ensure every group have same length
         return framesGroupList
 
     @property

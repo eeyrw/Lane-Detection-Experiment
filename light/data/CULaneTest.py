@@ -26,7 +26,7 @@ culaneDs = CULaneDataset('E:\CULane',
                          split='test',
                          mode='consecutive',
                          #resizeAndCropTo=(512, 256),
-                         framesGroupSize=5,
+                         framesGroupSize=10,
                          transformForImage=input_transform,
                          transformForSeg=transfrom_seg,
                          transformForAll=transfrom_all,
@@ -37,7 +37,7 @@ culaneDs = CULaneDataset('E:\CULane',
 writer = SummaryWriter()
 
 
-for i in range(453, 453+2):
+for i in range(453, 453+20):
     a = culaneDs[i]
     maxVal=torch.max(a[0])
     minVal=torch.min(a[0])
@@ -46,5 +46,5 @@ for i in range(453, 453+2):
     minVal=torch.min(a[1])
     d=(a[1].float()-minVal)/(maxVal-minVal)
     writer.add_images('my_image_batch', b, 0, dataformats='NCHW')
-    writer.add_images('my_seg_batch', d.unsqueeze(1), 0, dataformats='NCHW')
+    writer.add_images('my_seg_batch', d, 0, dataformats='NCHW')
 writer.close()
