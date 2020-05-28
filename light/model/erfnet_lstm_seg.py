@@ -13,9 +13,9 @@ class CLSTM_cell(nn.Module):
     """ConvLSTMCell
     """
 
-    def __init__(self, input_channels, filter_size, num_features):
+    def __init__(self, input_channels, filter_size, num_features,device='cpu'):
         super(CLSTM_cell, self).__init__()
-
+        self.device = device
         self.input_channels = input_channels
         self.filter_size = filter_size
         self.num_features = num_features
@@ -35,9 +35,9 @@ class CLSTM_cell(nn.Module):
         width = inputs.shape[3]
         if hidden_state is None:
             hx = torch.zeros(1, channel, height,
-                             width)
+                             width,device=self.device)
             cx = torch.zeros(1, channel, height,
-                             width)
+                             width,device=self.device)
         else:
             hx, cx = hidden_state
         output_inner = []
@@ -202,15 +202,18 @@ class ERFNetLstm(nn.Module):
     def __init__(self,
                  num_classes,
                  encoder=None,
-                 pretrainWeightFile=None):
+                 pretrainWeightFile=None,
+                 device='cpu'
+                 ):
         super().__init__()
+        self.device = device
 
         if (encoder == None):
             self.encoder = Encoder(num_classes)
         else:
             self.encoder = encoder
         self.decoder = Decoder(num_classes)
-        self.clstm = CLSTM_cell(128, 3, 128)
+        self.clstm = CLSTM_cell(128, 3, 128,device=self.device)
         if pretrainWeightFile is not None:
             self.load_state_dict(
                 torch.load(pretrainWeightFile, map_location='cpu'), strict=False)

@@ -114,7 +114,8 @@ class Trainer(object):
         BatchNorm2d = nn.SyncBatchNorm if args.distributed else nn.BatchNorm2d
         self.model = get_segmentation_model(args.model, dataset=args.dataset,
                                             aux=args.aux, norm_layer=BatchNorm2d,
-                                            pretrainWeightFile=args.pretrainWeight
+                                            pretrainWeightFile=args.pretrainWeight,
+                                            device=self.device,
                                             ).to(self.device)
 
         # resume checkpoint if needed
