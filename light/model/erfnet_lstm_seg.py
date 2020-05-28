@@ -34,15 +34,15 @@ class CLSTM_cell(nn.Module):
         height = inputs.shape[2]
         width = inputs.shape[3]
         if hidden_state is None:
-            hx = torch.zeros(1,channel, height,
+            hx = torch.zeros(1, channel, height,
                              width)
-            cx = torch.zeros(1,channel, height,
+            cx = torch.zeros(1, channel, height,
                              width)
         else:
             hx, cx = hidden_state
         output_inner = []
         for index in range(seq_len):
-            x = inputs[index, ...].unsqueeze(0) # [C,H,W] to [1,C,H,W]
+            x = inputs[index, ...].unsqueeze(0)  # [C,H,W] to [1,C,H,W]
 
             combined = torch.cat((x, hx), 1)
             gates = self.conv(combined)  # gates: S, num_features*4, H, W
@@ -198,7 +198,11 @@ class Decoder (nn.Module):
 
 
 class ERFNetLstm(nn.Module):
-    def __init__(self, num_classes, encoder=None):  # use encoder to pass pretrained encoder
+    # use encoder to pass pretrained encoder
+    def __init__(self,
+                 num_classes,
+                 encoder=None,
+                 pretrainWeightFile=None):
         super().__init__()
 
         if (encoder == None):
@@ -207,6 +211,9 @@ class ERFNetLstm(nn.Module):
             self.encoder = encoder
         self.decoder = Decoder(num_classes)
         self.clstm = CLSTM_cell(128, 3, 128)
+        if pretrainWeightFile is not None:
+            self.load_state_dict(
+                torch.load(pretrainWeightFile, map_location='cpu'), strict=False)
 
     def forward(self, batchInputs, only_encode=False):
         #inputs : [N,SEQ_LEN,C,H,W]
@@ -233,7 +240,8 @@ def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models
 if __name__ == '__main__':
     # from torchviz import make_dot
     model = ERFNetLstm(1)
-    batchInputs = torch.randn(2, 4, 3, 128, 256,dtype=torch.float, requires_grad=False)
+    batchInputs = torch.randn(
+        2, 4, 3, 128, 256, dtype=torch.float, requires_grad=False)
     b = model(batchInputs)
     # make_dot(b).render("attached", format="png")
     print(b.size())

@@ -25,6 +25,8 @@ def getParameter(bypassArgs=None):
                         help='dataset name (default: culane)')
     parser.add_argument('--rootDir', type=str, default=r'E:\CULane',
                         help='root directory (default: E:\\CULane)')
+    parser.add_argument('--pretrainWeight', type=str, default=None,
+                        help='pretrain weight file path (default: None )')                        
     parser.add_argument('--base-size', type=int, default=1024,
                         help='base image size')
     parser.add_argument('--crop-size', type=int, default=768,
