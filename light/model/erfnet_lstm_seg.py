@@ -232,7 +232,7 @@ class ERFNetLstm(nn.Module):
 def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models',
                         pretrained_base=False, **kwargs):
     from light.data import datasets
-    model = ERFNetLstm(datasets[dataset].NUM_CLASS)
+    model = ERFNetLstm(datasets[dataset].NUM_CLASS,**kwargs)
     if pretrained:
         from ..model import get_model_file
         model.load_state_dict(
