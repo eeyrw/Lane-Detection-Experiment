@@ -9,7 +9,7 @@ from torch.utils.data.dataset import Dataset
 
 
 class CULaneDataset(Dataset):
-    NUM_CLASS=1
+    NUM_CLASS = 1
     splitDict = {
         'train': {'isTest': False, 'dir': 'list/train_gt.txt'},
         'val': {'isTest': False, 'dir': 'list/val_gt.txt'},
@@ -173,7 +173,8 @@ class CULaneDataset(Dataset):
             rawSegImage = np.clip(rawSegImage, 0, 1)
             segImage = torch.from_numpy(rawSegImage).unsqueeze(0).float()
         else:
-            segImage =torch.from_numpy(np.array(rawSegImage)).unsqueeze(0).float()
+            segImage = torch.from_numpy(
+                np.array(rawSegImage)).unsqueeze(0).float()
 
         if requireRawImage:
             return imageRgb, segImage, imageFile
@@ -184,11 +185,15 @@ class CULaneDataset(Dataset):
         framesGroupList = []
         for _, clips in rawframesGroupDict.items():
             clipNum = len(clips)
-            for i in range(0, clipNum, self.framesGroupSize):
-                if (i + self.framesGroupSize) <= clipNum:
-                    framesGroupList.append(clips[i:i + self.framesGroupSize])
-                else:
-                    framesGroupList.append(clips[clipNum-self.framesGroupSize:]) # Ensure every group have same length
+            if clipNum >= self.framesGroupSize:
+                for i in range(0, clipNum, self.framesGroupSize):
+                    if (i + self.framesGroupSize) <= clipNum:
+                        framesGroupList.append(
+                            clips[i:i + self.framesGroupSize])
+                    else:
+                        # Ensure every group have same length
+                        framesGroupList.append(
+                            clips[clipNum-self.framesGroupSize:])
         return framesGroupList
 
     @property
