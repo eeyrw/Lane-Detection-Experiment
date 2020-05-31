@@ -121,7 +121,7 @@ class CULaneDataset(Dataset):
                 imagesRgb.append(imageRgb)
                 segImages.append(segImage)
             if self.requireRawImage:
-                return torch.stack(imagesRgb), torch.stack(segImages), torch.stack(imageFiles)
+                return torch.stack(imagesRgb), torch.stack(segImages), imageFiles
             else:
                 return torch.stack(imagesRgb), torch.stack(segImages)
 
