@@ -205,6 +205,7 @@ class LaneNetErfNetSeg(nn.Module):
             nn.Conv2d(32, 8, 3, padding=1, bias=False),
             nn.BatchNorm2d(8),
             nn.ReLU(),
+            nn.PixelShuffle()
             nn.Upsample(scale_factor=8, mode='bilinear', align_corners=True)
         )
 
