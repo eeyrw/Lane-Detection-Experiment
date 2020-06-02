@@ -13,12 +13,14 @@ class CLSTM_cell(nn.Module):
     """ConvLSTMCell
     """
 
-    def __init__(self, input_channels, filter_size, num_features,device='cpu'):
+    def __init__(self, input_channels, filter_size, num_features, device='cpu', isValMode=False, isNoMemory=False):
         super(CLSTM_cell, self).__init__()
         self.device = device
         self.input_channels = input_channels
         self.filter_size = filter_size
         self.num_features = num_features
+        self.isValMode = isValMode
+        self.isNoMemory = isNoMemory
         # in this way the output has the same size
         self.padding = (filter_size - 1) // 2
         self.conv = nn.Sequential(
@@ -26,6 +28,8 @@ class CLSTM_cell(nn.Module):
                       4 * self.num_features, self.filter_size, 1,
                       self.padding),
             nn.GroupNorm(4 * self.num_features // 32, 4 * self.num_features))
+        self.hidden_state = None
+        self.counter = 0
 
     def forward(self, inputs, hidden_state=None):
         # inputs [N,C,H,W]
@@ -33,13 +37,14 @@ class CLSTM_cell(nn.Module):
         channel = inputs.shape[1]
         height = inputs.shape[2]
         width = inputs.shape[3]
-        if hidden_state is None:
+        if self.hidden_state is None:
             hx = torch.zeros(1, channel, height,
-                             width,device=self.device)
+                             width, device=self.device, requires_grad=False if self.isValMode else True)
             cx = torch.zeros(1, channel, height,
-                             width,device=self.device)
+                             width, device=self.device, requires_grad=False if self.isValMode else True)
+            self.hidden_state = (hx, cx)
         else:
-            hx, cx = hidden_state
+            hx, cx = self.hidden_state
         output_inner = []
         for index in range(seq_len):
             x = inputs[index, ...].unsqueeze(0)  # [C,H,W] to [1,C,H,W]
@@ -59,6 +64,12 @@ class CLSTM_cell(nn.Module):
             output_inner.append(hy)
             hx = hy
             cx = cy
+        if self.isValMode and (not self.isNoMemory):
+            if self.counter > 5:
+                self.counter = 0
+                self.hidden_state = (hx, cx)
+            else:
+                self.counter = self.counter+1
         return torch.stack(output_inner).squeeze(1), (hy, cy)
 
 
@@ -203,36 +214,48 @@ class ERFNetLstm(nn.Module):
                  num_classes,
                  encoder=None,
                  pretrainWeightFile=None,
-                 device='cpu'
+                 device='cpu',
+                 isValMode=False,
+                 isNoMemory=False
                  ):
         super().__init__()
         self.device = device
+        self.isValMode = isValMode
+        self.isNoMemory = isNoMemory
 
         if (encoder == None):
             self.encoder = Encoder(num_classes)
         else:
             self.encoder = encoder
         self.decoder = Decoder(num_classes)
-        self.clstm = CLSTM_cell(128, 3, 128,device=self.device)
+        self.clstm = CLSTM_cell(
+            128, 3, 128, device=self.device, isValMode=self.isValMode, isNoMemory=self.isNoMemory)
         if pretrainWeightFile is not None:
             self.load_state_dict(
                 torch.load(pretrainWeightFile, map_location='cpu'), strict=False)
 
     def forward(self, batchInputs, only_encode=False):
-        #inputs : [N,SEQ_LEN,C,H,W]
-        batchOutputs = []
-        for inputs in batchInputs:
-            intermidiateOutputs = self.encoder(inputs)
+        if not self.isValMode:
+            #inputs : [N,SEQ_LEN,C,H,W]
+            batchOutputs = []
+            for inputs in batchInputs:
+                intermidiateOutputs = self.encoder(inputs)
+                intermidiateOutputs, _ = self.clstm(intermidiateOutputs)
+                outputs = self.decoder.forward(intermidiateOutputs)
+                batchOutputs.append(outputs)
+            return torch.stack(batchOutputs)
+        else:
+            #inputs : [N,C,H,W]
+            intermidiateOutputs = self.encoder(batchInputs)
             intermidiateOutputs, _ = self.clstm(intermidiateOutputs)
             outputs = self.decoder.forward(intermidiateOutputs)
-            batchOutputs.append(outputs)
-        return torch.stack(batchOutputs)
+            return outputs
 
 
 def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models',
                         pretrained_base=False, **kwargs):
     from light.data import datasets
-    model = ERFNetLstm(datasets[dataset].NUM_CLASS,**kwargs)
+    model = ERFNetLstm(datasets[dataset].NUM_CLASS, **kwargs)
     if pretrained:
         from ..model import get_model_file
         model.load_state_dict(
@@ -242,9 +265,12 @@ def get_erfnet_lstm_seg(dataset='citys', pretrained=False, root='~/.torch/models
 
 if __name__ == '__main__':
     # from torchviz import make_dot
-    model = ERFNetLstm(1)
+    model = ERFNetLstm(1, isValMode=True)
+    model.eval()
+    # batchInputs = torch.randn(
+    #     2, 4, 3, 128, 256, dtype=torch.float, requires_grad=False)
     batchInputs = torch.randn(
-        2, 4, 3, 128, 256, dtype=torch.float, requires_grad=False)
+        1, 3, 128, 256, dtype=torch.float, requires_grad=False)
     b = model(batchInputs)
     # make_dot(b).render("attached", format="png")
     print(b.size())

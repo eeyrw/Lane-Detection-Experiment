@@ -55,7 +55,7 @@ def str2bool(v):
 def parse_args(bypassArgs=None):
     parser = argparse.ArgumentParser(description='Lane Detection Experiment')
     # model and dataset
-    parser.add_argument('--model', type=str, default='erfnet',
+    parser.add_argument('--model', type=str, default='erfnet_lstm',
                         help='model name (default: mobilenet)')
     parser.add_argument('--dataset', type=str, default='culane',
                         help='dataset name (default: culane)')
@@ -116,20 +116,22 @@ class Evaler(object):
                        'transformForImage': self.transFormsForImage_val,
                        'transformForSeg': self.transFormsForSeg_val,
                        'requireRawImage': True,
-                       'rootDir': args.rootDir
+                       'rootDir': args.rootDir,
+                       'mode': 'consecutive',
+                       'framesGroupSize': 10
                        }
         valset = get_segmentation_dataset(
             args.dataset, split='test8_night', **data_kwargs)
         self.val_loader = data.DataLoader(dataset=valset,
-                                          # shuffle=True,
+                                          shuffle=True,
                                           num_workers=args.workers,
                                           pin_memory=True)
 
         # create network
-        BatchNorm2d = nn.SyncBatchNorm if args.distributed else nn.BatchNorm2d
-        self.model = get_segmentation_model(args.model, dataset=args.dataset,
-                                            aux=args.aux, norm_layer=BatchNorm2d).to(self.device)
-
+        self.model = get_segmentation_model(
+            args.model, dataset=args.dataset, isValMode=True).to(self.device)
+        self.model2 = get_segmentation_model(
+            args.model, dataset=args.dataset, isValMode=True,isNoMemory=True).to(self.device)
         # resume checkpoint if needed
         if args.resume:
             if os.path.isfile(args.resume):
@@ -138,6 +140,8 @@ class Evaler(object):
                 print('Resuming training, loading {}...'.format(args.resume))
                 self.model.load_state_dict(torch.load(
                     args.resume, map_location=lambda storage, loc: storage))
+                self.model2.load_state_dict(torch.load(
+                    args.resume, map_location=lambda storage, loc: storage))                    
 
     def visualizeImageAndLabel(self, image, label, output):
         maxVal = torch.max(image)
@@ -181,21 +185,34 @@ class Evaler(object):
             model = self.model.module
         else:
             model = self.model
+            model2 = self.model2
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
+        model2.eval()
         for image, target, rawImageFile in self.val_loader:
-            image = image.to(self.device)
-            target = target.to(self.device)
-            with torch.no_grad():
-                outputs = model(image)
-                X = self.visualizeImageAndLabel(
-                    image[0], target[0], torch.sigmoid(outputs[0]))
+            # N,SEQ_LEN,C,H,W
+            N, SEQ_LEN, C, H, W = image.shape
 
-                cv2.imshow('AAA', X)
-                k = cv2.waitKey(1) & 0xff
-                if k == 27:
-                    break
+            for i in range(N):
+                for j in range(SEQ_LEN):
+                    img = image[i][j].unsqueeze(0).to(self.device)
+                    tgt = target[i][j].unsqueeze(0).to(self.device)
+                    with torch.no_grad():
+                        outputs = model(img)
+                        o2 = model2(img)
+                        X = self.visualizeImageAndLabel(
+                            img[0], tgt[0], torch.sigmoid(outputs[0]))
+
+                        cv2.imshow('AAA', X)
+                        X = self.visualizeImageAndLabel(
+                            img[0], tgt[0], torch.sigmoid(o2[0]))
+
+                        cv2.imshow('BBB', X)
+                        k = cv2.waitKey(1) & 0xff
+                        if k == 27:
+                            break
         cv2.destroyWindow('AAA')
+        cv2.destroyWindow('BBB')
 
     def evalOnSingleImage(self, imagePath):
         if self.args.distributed:
@@ -236,8 +253,8 @@ class Evaler(object):
             model = self.model
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
-        cap = cv2.VideoCapture(videos[5])
-        out = cv2.VideoWriter('outpy.mp4',cv2.VideoWriter_fourcc('H','2','6','4'), 30, (800,900))
+        cap = cv2.VideoCapture(videos[2])
+        # out = cv2.VideoWriter('outpy.mp4',cv2.VideoWriter_fourcc('H','2','6','4'), 30, (800,900))
         while (cap.isOpened()):
             # ret = a boolean return value from getting the frame, frame = the current frame being projected in the video
             for i in range(1):
@@ -252,13 +269,59 @@ class Evaler(object):
                 X = self.visualizeImageAndLabel(image[0], torch.zeros_like(
                     outputs[0]), torch.sigmoid(outputs[0]))
                 cv2.imshow('AAA', X)
-                out.write(X)
+                # out.write(X)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         # The following frees up resources and closes all windows
         cap.release()
         cv2.destroyAllWindows()
 
+    def evalOnVideo2(self):
+        videos = [r"C:\Users\yuan\Documents\研究生课题\LDW Research\highway45.mp4",
+                  r"C:\Users\yuan\Documents\研究生课题\LDW Research\Mitsubishi Evo VIII MR - Forza Horizon 4 _ Logitech g29 gameplay.mp4",
+                  r"C:\Users\yuan\Desktop\lane-detector-master\REC073.mp4",
+                  r"C:\Users\yuan\Documents\研究生课题\drivingVideo.mp4",
+                  r"C:\Users\yuan\Documents\研究生课题\pikes peak.mp4",
+                  r"E:\Lane Dataset\Jiqing Expressway Video\IMG_0308.mov",
+                  r"E:\Lane Dataset\Jiqing Expressway Video\IMG_0253.mov",
+                  r"C:\Users\yuan\Desktop\QQ视频_c8a5486414df1c55787f097d6af685281590107727.mp4"
+                  ]
+        # The video feed is read in as a VideoCapture object
+
+        if self.args.distributed:
+            model = self.model.module
+        else:
+            model = self.model
+            model2 = self.model2
+        torch.cuda.empty_cache()  # TODO check if it helps
+        model.eval()
+        model2.eval()
+        cap = cv2.VideoCapture(videos[6])
+        # out = cv2.VideoWriter('outpy.mp4',cv2.VideoWriter_fourcc('H','2','6','4'), 30, (800,900))
+        while (cap.isOpened()):
+            # ret = a boolean return value from getting the frame, frame = the current frame being projected in the video
+            for i in range(10):
+                ret, frame = cap.read()
+            if frame is None:
+                break
+            imageRgb = self.transFormsForImage_val(self.transFormsForAll_val(
+                Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))))
+            image = torch.unsqueeze(imageRgb, 0).to(self.device)
+            with torch.no_grad():
+                outputs = model(image)
+                o2 = model2(image)
+                X = self.visualizeImageAndLabel(image[0], torch.zeros_like(
+                    outputs[0]), torch.sigmoid(outputs[0]))
+                cv2.imshow('AAA', X)
+                X = self.visualizeImageAndLabel(image[0], torch.zeros_like(
+                    outputs[0]), torch.sigmoid(o2[0]))
+                cv2.imshow('BBB', X)
+                # out.write(X)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        # The following frees up resources and closes all windows
+        cap.release()
+        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
 
@@ -276,14 +339,15 @@ if __name__ == '__main__':
     else:
         args.distributed = False
         args.device = "cpu"
+    
 
     # args.resume = 'erfnet_culane_best_model_lowRes-2020.05.23.12.52.56.pth '
-    args.resume = 'erfnet_culane_best_model_exprTest-2020.05.21.15.24.24_.pth'
+    args.resume = 'erfnet_lstm_culane_best_model_clstm_10frames_scratch-2020.05.29.08.34.15.pth'
 
-    args.crop_size_h = 256 
-    args.crop_size_w = 512    
+    args.crop_size_h = 256
+    args.crop_size_w = 512
     evaler = Evaler(args)
     # evaler.eval()
-    evaler.evalOnSingleImage(r"c:\Users\yuan\Desktop\0460080053.jpg")
-   #  evaler.evalOnVideo()
+    # evaler.evalOnSingleImage(r"c:\Users\yuan\Desktop\0460080053.jpg")
+    evaler.evalOnVideo2()
     torch.cuda.empty_cache()
