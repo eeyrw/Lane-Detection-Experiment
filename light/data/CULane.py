@@ -174,7 +174,7 @@ class CULaneDataset(Dataset):
             segImage = torch.from_numpy(rawSegImage).unsqueeze(0).float()
         else:
             segImage = torch.from_numpy(
-                np.array(rawSegImage)).unsqueeze(0).float()
+                np.array(rawSegImage)).unsqueeze(0)
 
         if requireRawImage:
             return imageRgb, segImage, imageFile

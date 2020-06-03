@@ -106,7 +106,6 @@ class Trainer(object):
         self.model = get_segmentation_model(args.model, dataset=args.dataset,
                                             aux=args.aux, norm_layer=BatchNorm2d).to(self.device)
 
-
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
                                          lr=args.lr,
@@ -134,7 +133,14 @@ class Trainer(object):
             images = images.to(self.device)
             targets = targets.to(self.device)
 
-            loss = self.model(images,targets)
+            resultDict = self.model(images, targets)
+            embedding = resultDict['embedding']
+            binary_seg = resultDict['binary_seg']
+            loss_seg = resultDict['loss_seg']
+            loss_var = resultDict['loss_var']
+            loss_dist = resultDict['loss_dist']
+            reg_loss = resultDict['reg_loss']
+            loss = resultDict['loss']
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -153,13 +159,22 @@ class Trainer(object):
                         self.exprHelper.getEstimatedTime()))
 
                 self.exprHelper.writer.add_scalar(
-                    'Loss/train', loss, iteration)
+                    'Loss/trainTotal', loss, iteration)
+                self.exprHelper.writer.add_scalar(
+                    'Loss/trainSegmentation', loss_seg, iteration)
+                self.exprHelper.writer.add_scalar(
+                    'Loss/trainDistance', loss_dist, iteration)
+                self.exprHelper.writer.add_scalar(
+                    'Loss/trainVariance', loss_var, iteration)
+                self.exprHelper.writer.add_scalar(
+                    'Loss/trainReg', reg_loss, iteration)
+
                 self.exprHelper.writer.add_scalar('HyperParameter/learning_rate',
                                                   self.optimizer.param_groups[0]['lr'], iteration)
 
             if self.exprHelper.isTimeToSaveCheckPoint():
                 self.exprHelper.save_checkpoint(
-                    self.model, self.args, is_best=False)
+                    self.model, args, is_best=False)
 
             if self.exprHelper.isTimeToValidate():
                 val_loss = self.validation(self.exprHelper.writer, iteration)
