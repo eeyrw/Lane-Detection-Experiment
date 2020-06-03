@@ -77,6 +77,8 @@ def getParameter(bypassArgs=None):
                         help='Directory for saving checkpoint models')
     parser.add_argument('--log-iter', type=int, default=10,
                         help='print log every log-iter')
+    parser.add_argument('--train-log-iter', type=int, default=1000,
+                        help='log every train-iter')
     # evaluation only
     parser.add_argument('--skip-val', action='store_true', default=False,
                         help='skip validation during training')

@@ -10,7 +10,7 @@ import torch
 
 
 
-original = torch.load('mobilenetv3_small_culane.pth',map_location=torch.device('cpu'))
+original = torch.load('erfnet_pretrained.pth',map_location=torch.device('cpu'))
 for k,v in original.items():
     print('%s: %s %s'%(k,v.shape,v.type()))
     if v.type()=='torch.FloatTensor':

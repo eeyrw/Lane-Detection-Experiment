@@ -12,8 +12,9 @@ from light.utils.distributed import *
 from light.utils.logger import setup_logger
 from light.utils.lr_scheduler import WarmupPolyLR
 from light.utils.metric import SegmentationMetric
+from light.data import get_segmentation_dataset
+from light.model import get_segmentation_model
 from light.nn import MixSoftmaxCrossEntropyLoss, MixSoftmaxCrossEntropyOHEMLoss, SoftDiceLoss
-from light.data.CULane import CULaneDataset
 
 import shutil
 import datetime
@@ -22,22 +23,22 @@ import torch.utils.data as data
 import torch.backends.cudnn as cudnn
 import time
 from parameter import getParameter
-from DiceLoss import BatchSoftDiceLoss
-from DiceLoss import BatchSoftBinaryDiceLoss
 from torch.utils.tensorboard import SummaryWriter
 import light.data.sync_transforms as pairedTr
+import ExperimentHelper
 
 
 class Trainer(object):
     def __init__(self, args):
-        self.args = args
-        self.device = torch.device(args.device)
+        self.exprHelper = ExperimentHelper.ExperimentHelper(args)
+        self.device = self.exprHelper.device
+        args = self.exprHelper.args
 
         # image transform for train
         transFormsForAll = pairedTr.Compose([
             pairedTr.RandomPerspective(distortion_scale=0.3, p=0.2),
             pairedTr.RandomResizedCrop(
-                (256, 512), scale=(0.6, 1.0), ratio=(2/1, 2/1)),
+                (args.crop_size_h, args.crop_size_w), scale=(0.75, 1.0), ratio=(args.crop_size_w/args.crop_size_h, args.crop_size_w/args.crop_size_h)),
         ])
 
         transFormsForImage = pairedTr.Compose([
@@ -53,7 +54,7 @@ class Trainer(object):
 
         transFormsForAll_val = pairedTr.Compose([
             pairedTr.RandomResizedCrop(
-                (256, 512), scale=(0.6, 1.0), ratio=(2/1, 2/1)),
+                (args.crop_size_h, args.crop_size_w), scale=(0.75, 1.0), ratio=(args.crop_size_w/args.crop_size_h, args.crop_size_w/args.crop_size_h)),
         ])
 
         transFormsForImage_val = pairedTr.Compose([
@@ -67,16 +68,15 @@ class Trainer(object):
         data_kwargs = {'transformForAll': transFormsForAll,
                        'transformForImage': transFormsForImage,
                        'transformForSeg': transFormsForSeg,
-                       'segDistinguishInstance': True}
+                       'rootDir': args.rootDir}
         data_kwargs_val = {'transformForAll': transFormsForAll_val,
                            'transformForImage': transFormsForImage_val,
-                           'transformForSeg': transFormsForSeg_val}
+                           'transformForSeg': transFormsForSeg_val,
+                           'rootDir': args.rootDir}
 
-        trainset = CULaneDataset(
-            args.rootDir, split='train', **data_kwargs)
-        args.iters_per_epoch = len(
-            trainset) // (args.num_gpus * args.batch_size)
-        args.max_iters = args.epochs * args.iters_per_epoch
+        trainset = get_segmentation_dataset(
+            args.dataset, split='train', **data_kwargs)
+        self.trainSetLen = len(trainset)
 
         train_sampler = make_data_sampler(
             trainset, shuffle=True, distributed=args.distributed)
@@ -88,8 +88,8 @@ class Trainer(object):
                                             pin_memory=True)
 
         if not args.skip_val:
-            valset = CULaneDataset(
-                args.rootDir, split='val', **data_kwargs_val)
+            valset = get_segmentation_dataset(
+                args.dataset, split='val', **data_kwargs_val)
             val_sampler = make_data_sampler(valset, False, args.distributed)
             val_batch_sampler = make_batch_data_sampler(
                 val_sampler, args.batch_size)
@@ -99,36 +99,19 @@ class Trainer(object):
                                               pin_memory=True)
 
         # create network
+        BatchNorm2d = nn.SyncBatchNorm if args.distributed else nn.BatchNorm2d
         self.model = get_segmentation_model(args.model, dataset=args.dataset,
-                                            aux=args.aux, norm_layer=nn.BatchNorm2d)
+                                            aux=args.aux, norm_layer=BatchNorm2d).to(self.device)
 
-        if torch.cuda.device_count() > 1:
-            print("Let's use", torch.cuda.device_count(), "GPUs!")
-            # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-            self.model = nn.DataParallel(self.model)
-
-        self.model.to(self.device)                                  
-
-        # resume checkpoint if needed
-        if args.resume:
-            if os.path.isfile(args.resume):
-                name, ext = os.path.splitext(args.resume)
-                assert ext == '.pkl' or '.pth', 'Sorry only .pth and .pkl files supported.'
-                print('Resuming training, loading {}...'.format(args.resume))
-                self.model.load_state_dict(torch.load(
-                    args.resume, map_location=lambda storage, loc: storage))
-
-        # create criterion
-        # self.criterion = MixSoftmaxCrossEntropyLoss(
-        #    args.aux, args.aux_weight, ignore_index=-1).to(self.device)
-        # self.criterion = SoftDiceLoss().to(self.device)
-        self.criterion = BatchSoftDiceLoss().to(self.device)
+        self.criterion = torch.nn.BCEWithLogitsLoss(
+            reduction='mean', pos_weight=torch.tensor([20])).to(self.device)
 
         # optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(),
                                          lr=args.lr,
                                          momentum=args.momentum,
                                          weight_decay=args.weight_decay)
+
         # lr scheduling
         self.lr_scheduler = WarmupPolyLR(self.optimizer,
                                          max_iters=args.max_iters,
@@ -137,136 +120,93 @@ class Trainer(object):
                                          warmup_iters=args.warmup_iters,
                                          warmup_method=args.warmup_method)
 
-        # evaluation metrics
-        self.metric = SegmentationMetric(trainset.num_class)
-
         self.best_pred = 0.0
+        self.best_val_loss = 1000000
 
     def train(self):
-        save_to_disk = get_rank() == 0
-        epochs, max_iters = self.args.epochs, self.args.max_iters
-        log_per_iters, val_per_iters = self.args.log_iter, self.args.val_epoch * \
-            self.args.iters_per_epoch
-        save_per_iters = self.args.save_epoch * self.args.iters_per_epoch
-        start_time = time.time()
-        logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
-            epochs, max_iters))
-        writer = SummaryWriter()
-
+        self.exprHelper.trainPrepare(self.trainSetLen)
         self.model.train()
         for iteration, (images, targets) in enumerate(self.train_loader):
             iteration += 1
+            self.exprHelper.updateIteration(iteration)
 
             images = images.to(self.device)
             targets = targets.to(self.device)
 
             outputs = self.model(images)
-            losses = self.criterion(outputs[0], targets)
+            loss = self.criterion(outputs, targets)
 
             self.optimizer.zero_grad()
-            losses.backward()
+            loss.backward()
             self.optimizer.step()
             self.lr_scheduler.step()
 
-            eta_seconds = ((time.time() - start_time) /
-                           iteration) * (max_iters - iteration)
-            eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
-
-            if iteration % log_per_iters == 0 and save_to_disk:
-                logger.info(
+            if self.exprHelper.isTimeToLog():
+                self.exprHelper.logger.info(
                     "Iters: {:d}/{:d} || Lr: {:.6f} || Loss: {:.4f} || Cost Time: {} || Estimated Time: {}".format(
-                        iteration, max_iters, self.optimizer.param_groups[0]['lr'], losses,
-                        str(datetime.timedelta(seconds=int(time.time() - start_time))), eta_string))
+                        iteration,
+                        self.exprHelper.args.max_iters,
+                        self.optimizer.param_groups[0]['lr'],
+                        loss,
+                        str(datetime.timedelta(seconds=int(
+                            time.time() - self.exprHelper.start_time))),
+                        self.exprHelper.getEstimatedTime()))
 
-                writer.add_scalar('Loss/train', losses, iteration)
-                writer.add_scalar('HyperParameter/learning_rate',
-                                  self.optimizer.param_groups[0]['lr'], iteration)
+                self.exprHelper.writer.add_scalar(
+                    'Loss/train', loss, iteration)
+                self.exprHelper.writer.add_scalar('HyperParameter/learning_rate',
+                                                  self.optimizer.param_groups[0]['lr'], iteration)
 
-            if iteration % save_per_iters == 0 and save_to_disk:
-                save_checkpoint(self.model, self.args, is_best=False)
+            if self.exprHelper.isTimeToSaveCheckPoint():
+                self.exprHelper.save_checkpoint(
+                    self.model, self.args, is_best=False)
 
-            if not self.args.skip_val and iteration % val_per_iters == 0:
-                mIoU = self.validation()
-                writer.add_scalar('mIoU/val', mIoU, iteration)
+            if self.exprHelper.isTimeToValidate():
+                val_loss = self.validation(self.exprHelper.writer, iteration)
+                self.exprHelper.writer.add_scalar(
+                    'Loss/val', val_loss, iteration)
                 self.model.train()
 
-        save_checkpoint(self.model, self.args, is_best=False)
-        total_training_time = time.time() - start_time
-        total_training_str = str(
-            datetime.timedelta(seconds=total_training_time))
-        logger.info(
-            "Total training time: {} ({:.4f}s / it)".format(
-                total_training_str, total_training_time / max_iters))
+            if self.exprHelper.isTimeToCheckTrainResult():
+                self.exprHelper.visualizeImageAndLabel('TrainSamples', iteration, images[0].cpu(
+                ), targets[0].cpu(), torch.sigmoid(outputs[0]).cpu())
+        self.exprHelper.trainFinish(self.model)
 
-    def validation(self):
+    def validation(self, writer, iteration):
         # total_inter, total_union, total_correct, total_label = 0, 0, 0, 0
         is_best = False
-        self.metric.reset()
-        if self.args.distributed:
-            model = self.model.module
-        else:
-            model = self.model
+        model = self.model
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
+        lossList = []
         for i, (image, target) in enumerate(self.val_loader):
             image = image.to(self.device)
             target = target.to(self.device)
 
             with torch.no_grad():
-                outputs = model(image)
-            self.metric.update(outputs[0], target)
-            pixAcc, mIoU = self.metric.get()
-            logger.info("Sample: {:d}, Validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
-                i + 1, pixAcc, mIoU))
+                output = model(image)
+                loss = self.criterion(output, target)
+                lossList.append(loss)
+            self.exprHelper.logger.info("Sample: {:d}, loss: {:.8f}".format(
+                i + 1, loss))
 
-        new_pred = (pixAcc + mIoU) / 2
-        if new_pred > self.best_pred:
+            if i == 0:
+                self.visualizeImageAndLabel(writer, 'ValidationSamples', iteration, image[0].cpu(
+                ), target[0].cpu(), torch.sigmoid(output[0]).cpu())
+
+        new_val_loss = torch.Tensor(lossList).mean()
+        if new_val_loss < self.best_val_loss:
             is_best = True
-            self.best_pred = new_pred
-        save_checkpoint(self.model, self.args, is_best)
+            self.best_val_loss = new_val_loss
+        self.exprHelper.save_checkpoint(self.model, is_best)
         synchronize()
-        return mIoU
-
-
-def save_checkpoint(model, args, is_best=False):
-    """Save Checkpoint"""
-    directory = os.path.expanduser(args.save_dir)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    filename = '{}_{}.pth'.format(args.model, args.dataset)
-    filename = os.path.join(directory, filename)
-
-    torch.save(model.state_dict(), filename)
-    if is_best:
-        best_filename = '{}_{}_best_model.pth'.format(args.model, args.dataset)
-        best_filename = os.path.join(directory, best_filename)
-        shutil.copyfile(filename, best_filename)
+        return new_val_loss
 
 
 if __name__ == '__main__':
 
     print(os.getcwd())
     args = getParameter()
-
-    # reference maskrcnn-benchmark
-    num_gpus = int(os.environ["WORLD_SIZE"]
-                   ) if "WORLD_SIZE" in os.environ else 1
-    args.num_gpus = num_gpus
-    args.distributed = num_gpus > 1
-    if args.cuda_usage and torch.cuda.is_available():
-        cudnn.benchmark = True
-        args.device = "cuda"
-    else:
-        args.distributed = False
-        args.device = "cpu"
-
-    args.lr = args.lr * num_gpus
-
-    logger = setup_logger(args.model, args.log_dir, get_rank(), filename='{}_{}_log.txt'.format(
-        args.model, args.dataset))
-    logger.info("Using {} GPUs".format(num_gpus))
-    logger.info(args)
-
     trainer = Trainer(args)
     trainer.train()
     torch.cuda.empty_cache()
