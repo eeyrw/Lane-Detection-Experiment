@@ -22,6 +22,7 @@ def get_segmentation_model(model, **kwargs):
         'efficientnet': get_efficientnet_seg,
         'erfnet': get_erfnet_seg,
         'erfnet_lstm': get_erfnet_lstm_seg,
+        'lanenet_erfnet': get_lanenet_erfnet_seg,
     }
     return models[model](**kwargs)
 
