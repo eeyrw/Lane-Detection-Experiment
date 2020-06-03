@@ -200,7 +200,10 @@ class Trainer(object):
 
             with torch.no_grad():
                 output = model(image)
-                loss = self.criterion(output, target)
+                resultDict = self.model(images, targets)
+                embedding = resultDict['embedding']
+                binary_seg = resultDict['binary_seg']
+                loss = resultDict['loss']
                 lossList.append(loss)
             self.exprHelper.logger.info("Sample: {:d}, loss: {:.8f}".format(
                 i + 1, loss))
