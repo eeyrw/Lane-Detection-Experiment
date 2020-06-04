@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import light.model.erfnet_seg
+import math
 
 
 class FeatureMapVisualizer(object):
@@ -16,9 +17,12 @@ class FeatureMapVisualizer(object):
     def viz(self, module, input):
         x = input[0][0]
         # 最多显示4张图
-        min_num = np.minimum(4, x.size()[0])
+        min_num = np.minimum(128, x.size()[0])
+        col = int(math.sqrt(min_num))
+        col = col if min_num-col*col<0 else col+1
+        row = col if min_num-col*col<0 else col+1
         for i in range(min_num):
-            plt.subplot(1, 4, i+1)
+            plt.subplot(row, col, i+1)
             plt.imshow(x[i].cpu().detach().numpy())
         plt.show()
 
