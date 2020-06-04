@@ -13,18 +13,21 @@ class FeatureMapVisualizer(object):
     def __init__(self, model):
         self.model = model
         self._HookModel()
+        self.counter = 0
 
     def viz(self, module, input):
         x = input[0][0]
         # 最多显示4张图
         min_num = np.minimum(128, x.size()[0])
         col = int(math.sqrt(min_num))
-        col = col if min_num-col*col<=0 else col+1
-        row = col if min_num-col*col<=0 else col+1
+        col = col if min_num-col*col <= 0 else col+1
+        row = col if min_num-col*col <= 0 else col+1
         for i in range(min_num):
             plt.subplot(row, col, i+1)
             plt.imshow(x[i].cpu().detach().numpy())
-        plt.show()
+        # plt.show()
+        plt.savefig('FeatureMaps/%s_%d.png' % ('sss', self.counter))
+        self.counter += 1
 
     def _HookModel(self):
         for name, m in self.model.named_modules():
