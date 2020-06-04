@@ -19,8 +19,8 @@ class FeatureMapVisualizer(object):
         # 最多显示4张图
         min_num = np.minimum(128, x.size()[0])
         col = int(math.sqrt(min_num))
-        col = col if min_num-col*col<0 else col+1
-        row = col if min_num-col*col<0 else col+1
+        col = col if min_num-col*col<=0 else col+1
+        row = col if min_num-col*col<=0 else col+1
         for i in range(min_num):
             plt.subplot(row, col, i+1)
             plt.imshow(x[i].cpu().detach().numpy())
