@@ -7,6 +7,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import light.model.erfnet_seg
 import math
+from torchvision import transforms
+from PIL import Image
+
 
 
 class FeatureMapVisualizer(object):
@@ -26,7 +29,7 @@ class FeatureMapVisualizer(object):
             plt.subplot(row, col, i+1)
             plt.imshow(x[i].cpu().detach().numpy())
         # plt.show()
-        plt.savefig('FeatureMaps/%s_%d.png' % ('sss', self.counter))
+        plt.savefig('FeatureMaps/%s_%d.png' % ('sss', self.counter),dpi=200)
         self.counter += 1
 
     def _HookModel(self):
@@ -39,10 +42,24 @@ class FeatureMapVisualizer(object):
                 m.register_forward_pre_hook(self.viz)
 
 
+def loadImage(imgPath):
+    transFormsForImage = transforms.Compose([
+        transforms.RandomResizedCrop(
+            (256, 512), scale=(0.9, 1.0), ratio=(2/1, 2/1)),
+        transforms.ToTensor(),
+        transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
+    ])
+
+    rawImageRgb = Image.open(imgPath).convert('RGB')
+    return transFormsForImage(rawImageRgb).unsqueeze(0)
+
+
 if __name__ == '__main__':
     # model = get_lanenet_erfnet_seg()
     model = light.model.erfnet_seg.ERFNet(1)
+    model.load_state_dict(torch.load(r'erfnet_culane_best_model_exprTest-2020.05.21.15.24.24_.pth'),strict=False)
+    model.eval()
     vs = FeatureMapVisualizer(model)
-    batchInputs = torch.randn(
-        1, 3, 128, 256, dtype=torch.float, requires_grad=False)
-    b = model(batchInputs)
+    # batchInputs = torch.randn(
+    #     1, 3, 128, 256, dtype=torch.float, requires_grad=False)
+    b = model(loadImage(r"C:\Users\yuan\Desktop\3558f4dd05d049098a4ca8744bf300d6.jpeg"))
