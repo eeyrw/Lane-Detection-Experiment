@@ -57,7 +57,7 @@ class Trainer(object):
             loss_seg = resultDict['loss_seg']
             loss_var = resultDict['loss_var']
             loss_dist = resultDict['loss_dist']
-            reg_loss = resultDict['reg_loss']
+            # reg_loss = resultDict['reg_loss']
             loss = resultDict['loss']
 
             self.args.optimizer.zero_grad()
@@ -77,15 +77,15 @@ class Trainer(object):
                         self.exprHelper.getEstimatedTime()))
 
                 self.exprHelper.writer.add_scalar(
-                    'Loss/trainTotal', loss, iteration)
+                    'Loss/trainTotalLoss', loss, iteration)
                 self.exprHelper.writer.add_scalar(
-                    'Loss/trainSegmentation', loss_seg, iteration)
+                    'Loss/trainSegmentationLoss', loss_seg, iteration)
                 self.exprHelper.writer.add_scalar(
-                    'Loss/trainDistance', loss_dist, iteration)
+                    'Loss/trainDistanceLoss', loss_dist, iteration)
                 self.exprHelper.writer.add_scalar(
-                    'Loss/trainVariance', loss_var, iteration)
-                self.exprHelper.writer.add_scalar(
-                    'Loss/trainReg', reg_loss, iteration)
+                    'Loss/trainVarianceLoss', loss_var, iteration)
+                # self.exprHelper.writer.add_scalar(
+                #     'Loss/trainRegLoss', reg_loss, iteration)
 
                 self.exprHelper.writer.add_scalar('HyperParameter/learning_rate',
                                                   self.args.optimizer.param_groups[0]['lr'], iteration)
@@ -136,6 +136,20 @@ class Trainer(object):
         self.exprHelper.save_checkpoint(self.model, is_best)
         synchronize()
         return new_val_loss
+        
+    def visualizeEmbedding(embedding):
+    # shape:(1, 4, 288, 800)
+    embedding= embedding[0]
+    maxV = embedding.max()
+    minV = embedding.min()
+    embedding = (embedding-minV)/(maxV-minV)
+    color = np.array([[255, 125, 0], [0, 255, 0], [0, 0, 255], [0, 255, 255]], dtype='float')
+    darkGroundImage = np.zeros((embedding.shape[1],embedding.shape[2],3),dtype='uint8') # HWC
+    for i, embeddingLayer in enumerate(embedding):
+        #colorMap = [(color*i/256).astype(np.uint8) for i in range(256)]
+        layer = cv2.applyColorMap((embeddingLayer*255).astype(np.uint8),cv2.COLORMAP_JET)
+        #darkGroundImage = cv2.addWeighted(src1=darkGroundImage, alpha=0.3, src2=layer, beta=1., gamma=0.)
+        cv2.imwrite("demo/embedding_%d.png"%i, layer)  
 
 
 if __name__ == '__main__':

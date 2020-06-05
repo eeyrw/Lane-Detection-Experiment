@@ -84,8 +84,7 @@ class ExperimentHelper(object):
 
         self.logger = setup_logger(self.args.modelName, self.args.log_dir, 0, filename='{}_{}_log_{}-{}.txt'.format(
             self.args.modelName, self.args.dataset, self.experimentName, self.experimentStartTime))
-        self.writer = SummaryWriter(comment='-%s-%s' %
-                                    (self.experimentName, self.experimentStartTime))
+        self.writer = SummaryWriter(comment='-%s' % self.experimentName)
         self.logger.info(self.args)
         self.logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(
             epochs, max_iters))
