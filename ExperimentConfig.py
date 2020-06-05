@@ -154,7 +154,8 @@ class ExperimentConfig(object):
         if not self.skip_val:
             self.valset = get_segmentation_dataset(
                 self.dataset, split='val', **data_kwargs_val)
-            val_sampler = make_data_sampler(self.valset, False, self.distributed)
+            val_sampler = make_data_sampler(
+                self.valset, False, self.distributed)
             val_batch_sampler = make_batch_data_sampler(
                 val_sampler, self.batch_size)
             self.val_loader = data.DataLoader(dataset=self.valset,
