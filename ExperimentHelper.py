@@ -118,6 +118,7 @@ class ExperimentHelper(object):
         self.logger.info(
             "Total training time: {} ({:.4f}s / it)".format(
                 total_training_str, total_training_time / self.args.max_iters))
+        self.writer.close()
 
     def visualizeImageAndLabel(self, tag, step, image, label, output):
         maxVal = torch.max(image)

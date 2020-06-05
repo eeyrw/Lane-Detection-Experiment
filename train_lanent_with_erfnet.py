@@ -26,6 +26,7 @@ from parameter import getParameter
 from torch.utils.tensorboard import SummaryWriter
 import light.data.sync_transforms as pairedTr
 import ExperimentHelper
+import sys
 
 
 class Trainer(object):
@@ -136,26 +137,12 @@ class Trainer(object):
         self.exprHelper.save_checkpoint(self.model, is_best)
         synchronize()
         return new_val_loss
-        
-    def visualizeEmbedding(embedding):
-    # shape:(1, 4, 288, 800)
-    embedding= embedding[0]
-    maxV = embedding.max()
-    minV = embedding.min()
-    embedding = (embedding-minV)/(maxV-minV)
-    color = np.array([[255, 125, 0], [0, 255, 0], [0, 0, 255], [0, 255, 255]], dtype='float')
-    darkGroundImage = np.zeros((embedding.shape[1],embedding.shape[2],3),dtype='uint8') # HWC
-    for i, embeddingLayer in enumerate(embedding):
-        #colorMap = [(color*i/256).astype(np.uint8) for i in range(256)]
-        layer = cv2.applyColorMap((embeddingLayer*255).astype(np.uint8),cv2.COLORMAP_JET)
-        #darkGroundImage = cv2.addWeighted(src1=darkGroundImage, alpha=0.3, src2=layer, beta=1., gamma=0.)
-        cv2.imwrite("demo/embedding_%d.png"%i, layer)  
 
 
 if __name__ == '__main__':
 
     print(os.getcwd())
-    trainer = Trainer('ExperimentConfigERFNetLaneNet')
-    trainer.train()
-    torch.cuda.empty_cache()
-    writer.close()
+    if len(sys.argv) == 2:
+        trainer = Trainer(str(sys.argv[1]))
+        trainer.train()
+        torch.cuda.empty_cache()
