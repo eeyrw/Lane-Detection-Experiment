@@ -142,6 +142,10 @@ class ExperimentConfig(object):
             self.dataset, split='train', **data_kwargs)
         self.trainSetLen = len(self.trainset)
 
+        self.iters_per_epoch = len(
+            trainset) // (args.num_gpus * args.batch_size)
+        self.max_iters = self.epochs * self.iters_per_epoch
+
         train_sampler = make_data_sampler(
             self.trainset, shuffle=True, distributed=self.distributed)
         train_batch_sampler = make_batch_data_sampler(
