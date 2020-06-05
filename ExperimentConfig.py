@@ -143,11 +143,11 @@ class ExperimentConfig(object):
         self.trainSetLen = len(self.trainset)
 
         self.iters_per_epoch = len(
-            trainset) // (args.num_gpus * args.batch_size)
+            self.trainset) // self.batch_size
         self.max_iters = self.epochs * self.iters_per_epoch
 
         train_sampler = make_data_sampler(
-            self.trainset, shuffle=True, distributed=self.distributed)
+            self.trainset, shuffle=True, distributed=False)
         train_batch_sampler = make_batch_data_sampler(
             train_sampler, self.batch_size, self.max_iters)
         self.train_loader = data.DataLoader(dataset=self.trainset,
@@ -159,7 +159,7 @@ class ExperimentConfig(object):
             self.valset = get_segmentation_dataset(
                 self.dataset, split='val', **data_kwargs_val)
             val_sampler = make_data_sampler(
-                self.valset, False, self.distributed)
+                self.valset, False, False)
             val_batch_sampler = make_batch_data_sampler(
                 val_sampler, self.batch_size)
             self.val_loader = data.DataLoader(dataset=self.valset,
