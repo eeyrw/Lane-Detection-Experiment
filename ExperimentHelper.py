@@ -22,14 +22,17 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.gridspec as gridspec
 import matplotlib
+import importlib
 
 
 class ExperimentHelper(object):
 
-    def __init__(self, args):
-        self.args = args
-        self.experimentName = args.exprName
+    def __init__(self, cfgPyFile):
+        cfg = importlib.import_module(cfgPyFile)
+        self.args = cfg.ExperimentConfig()
+        self.experimentName = self.args.exprName
         self.device = self._getDeviceUsage()
+        self.args.model.to(self.device)
         self.iteration = 0
 
     def _getDeviceUsage(self):
@@ -92,7 +95,7 @@ class ExperimentHelper(object):
 
     def getEstimatedTime(self):
         eta_seconds = ((time.time() - self.start_time) /
-                       iteration) * (self.args.max_iters - self.iteration)
+                       self.iteration) * (self.args.max_iters - self.iteration)
         eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
         return eta_string
 
@@ -106,7 +109,7 @@ class ExperimentHelper(object):
         return self.iteration % self.args.save_per_iters == 0
 
     def isTimeToValidate(self):
-        return  not self.args.skip_val and self.iteration % self.args.val_per_iters == 0
+        return not self.args.skip_val and self.iteration % self.args.val_per_iters == 0
 
     def trainFinish(self, model):
         self.save_checkpoint(model, is_best=False)

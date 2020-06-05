@@ -29,111 +29,26 @@ import ExperimentHelper
 
 
 class Trainer(object):
-    def __init__(self, args):
-        self.exprHelper = ExperimentHelper.ExperimentHelper(args)
+    def __init__(self, configPyFile):
+        self.exprHelper = ExperimentHelper.ExperimentHelper(configPyFile)
         self.device = self.exprHelper.device
-        args = self.exprHelper.args
-        assert args.model == 'lanenet_erfnet'
-
-        # image transform for train
-        transFormsForAll = pairedTr.Compose([
-            pairedTr.RandomPerspective(distortion_scale=0.3, p=0.2),
-            pairedTr.RandomResizedCrop(
-                (args.crop_size_h, args.crop_size_w), scale=(0.75, 1.0), ratio=(args.crop_size_w/args.crop_size_h, args.crop_size_w/args.crop_size_h)),
-        ])
-
-        transFormsForImage = pairedTr.Compose([
-            pairedTr.ColorJitter(0.3, 0.3, 0.3),
-            pairedTr.ToTensor(),
-            pairedTr.RandomErasing(p=0.2),
-            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
-        ])
-
-        transFormsForSeg = None
-
-        # image transform for val
-
-        transFormsForAll_val = pairedTr.Compose([
-            pairedTr.RandomResizedCrop(
-                (args.crop_size_h, args.crop_size_w), scale=(0.75, 1.0), ratio=(args.crop_size_w/args.crop_size_h, args.crop_size_w/args.crop_size_h)),
-        ])
-
-        transFormsForImage_val = pairedTr.Compose([
-            pairedTr.ToTensor(),
-            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
-        ])
-
-        transFormsForSeg_val = None
-
-        # dataset and dataloader
-        data_kwargs = {'transformForAll': transFormsForAll,
-                       'transformForImage': transFormsForImage,
-                       'transformForSeg': transFormsForSeg,
-                       'rootDir': args.rootDir,
-                       'segDistinguishInstance': True}
-        data_kwargs_val = {'transformForAll': transFormsForAll_val,
-                           'transformForImage': transFormsForImage_val,
-                           'transformForSeg': transFormsForSeg_val,
-                           'rootDir': args.rootDir,
-                           'segDistinguishInstance': True}
-
-        trainset = get_segmentation_dataset(
-            args.dataset, split='train', **data_kwargs)
-        self.trainSetLen = len(trainset)
-
-        train_sampler = make_data_sampler(
-            trainset, shuffle=True, distributed=args.distributed)
-        train_batch_sampler = make_batch_data_sampler(
-            train_sampler, args.batch_size, args.max_iters)
-        self.train_loader = data.DataLoader(dataset=trainset,
-                                            batch_sampler=train_batch_sampler,
-                                            num_workers=args.workers,
-                                            pin_memory=True)
-
-        if not args.skip_val:
-            valset = get_segmentation_dataset(
-                args.dataset, split='val', **data_kwargs_val)
-            val_sampler = make_data_sampler(valset, False, args.distributed)
-            val_batch_sampler = make_batch_data_sampler(
-                val_sampler, args.batch_size)
-            self.val_loader = data.DataLoader(dataset=valset,
-                                              batch_sampler=val_batch_sampler,
-                                              num_workers=args.workers,
-                                              pin_memory=True)
-
-        # create network
-        BatchNorm2d = nn.SyncBatchNorm if args.distributed else nn.BatchNorm2d
-        self.model = get_segmentation_model(args.model, dataset=args.dataset,
-                                            aux=args.aux, norm_layer=BatchNorm2d).to(self.device)
-
-        # optimizer
-        self.optimizer = torch.optim.SGD(self.model.parameters(),
-                                         lr=args.lr,
-                                         momentum=args.momentum,
-                                         weight_decay=args.weight_decay)
-
-        # lr scheduling
-        self.lr_scheduler = WarmupPolyLR(self.optimizer,
-                                         max_iters=args.max_iters,
-                                         power=0.9,
-                                         warmup_factor=args.warmup_factor,
-                                         warmup_iters=args.warmup_iters,
-                                         warmup_method=args.warmup_method)
+        self.args = self.exprHelper.args
+        assert self.args.modelName == 'lanenet_erfnet'
 
         self.best_pred = 0.0
         self.best_val_loss = 1000000
 
     def train(self):
-        self.exprHelper.trainPrepare(self.trainSetLen)
-        self.model.train()
-        for iteration, (images, targets) in enumerate(self.train_loader):
+        self.exprHelper.trainPrepare(self.args.trainSetLen)
+        self.args.model.train()
+        for iteration, (images, targets) in enumerate(self.args.train_loader):
             iteration += 1
             self.exprHelper.updateIteration(iteration)
 
             images = images.to(self.device)
             targets = targets.to(self.device)
 
-            resultDict = self.model(images, targets)
+            resultDict = self.args.model(images, targets)
             embedding = resultDict['embedding']
             binary_seg = resultDict['binary_seg']
             loss_seg = resultDict['loss_seg']
@@ -142,10 +57,10 @@ class Trainer(object):
             reg_loss = resultDict['reg_loss']
             loss = resultDict['loss']
 
-            self.optimizer.zero_grad()
+            self.args.optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
-            self.lr_scheduler.step()
+            self.args.optimizer.step()
+            self.args.lr_scheduler.step()
 
             if self.exprHelper.isTimeToLog():
                 self.exprHelper.logger.info(
@@ -224,8 +139,7 @@ class Trainer(object):
 if __name__ == '__main__':
 
     print(os.getcwd())
-    args = getParameter()
-    trainer = Trainer(args)
+    trainer = Trainer('ExperimentConfig')
     trainer.train()
     torch.cuda.empty_cache()
     writer.close()

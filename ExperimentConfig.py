@@ -1,5 +1,31 @@
+from torchvision import transforms
+from PIL import Image
+import scipy.io
+import numpy as np
+import cv2
+import os
+from tqdm import tqdm
+import torch
+import torch.nn as nn
+from torch.utils.data.dataset import Dataset
+from light.utils.distributed import *
+from light.utils.logger import setup_logger
+from light.utils.lr_scheduler import WarmupPolyLR
+from light.utils.metric import SegmentationMetric
+from light.data import get_segmentation_dataset
+from light.model import get_segmentation_model
+from light.nn import MixSoftmaxCrossEntropyLoss, MixSoftmaxCrossEntropyOHEMLoss, SoftDiceLoss
+
+import shutil
 import datetime
 import argparse
+import torch.utils.data as data
+import torch.backends.cudnn as cudnn
+import time
+from parameter import getParameter
+from torch.utils.tensorboard import SummaryWriter
+import light.data.sync_transforms as pairedTr
+import ExperimentHelper
 
 
 class ExperimentConfig(object):
@@ -8,7 +34,7 @@ class ExperimentConfig(object):
         self.exprName = 'defaultExpr'
 
         # model name (default: erfnet)
-        self.model = 'erfnet'
+        self.modelName = 'erfnet'
         # pretrain weight file path (default: None )
         self.pretrainWeight = None
 
@@ -66,3 +92,87 @@ class ExperimentConfig(object):
 
         # default settings for epochs, batch_size and lr
         self.lr = self.lr / 4 * self.batch_size
+
+        # image transform for train
+        self.transformForAll = pairedTr.Compose([
+            pairedTr.RandomPerspective(distortion_scale=0.3, p=0.2),
+            pairedTr.RandomResizedCrop(
+                (self.crop_size_h, self.crop_size_w),
+                scale=(0.75, 1.0),
+                ratio=(self.crop_size_w/self.crop_size_h, self.crop_size_w/self.crop_size_h)),
+        ])
+
+        self.transformForImage = pairedTr.Compose([
+            pairedTr.ColorJitter(0.3, 0.3, 0.3),
+            pairedTr.ToTensor(),
+            pairedTr.RandomErasing(p=0.2),
+            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+
+        self.transformForSeg = None
+
+        # image transform for val
+
+        self.transformForAll_val = pairedTr.Compose([
+            pairedTr.RandomResizedCrop(
+                (self.crop_size_h, self.crop_size_w),
+                scale=(0.75, 1.0),
+                ratio=(self.crop_size_w/self.crop_size_h, self.crop_size_w/self.crop_size_h)),
+        ])
+
+        self.transformForImage_val = pairedTr.Compose([
+            pairedTr.ToTensor(),
+            pairedTr.Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+
+        self.transformForSeg_val = None
+        # dataset and dataloader
+        data_kwargs = {'transformForAll': self.transformForAll,
+                       'transformForImage': self.transformForImage,
+                       'transformForSeg': self.transformForSeg,
+                       'rootDir': self.rootDir,
+                       'segDistinguishInstance': True}
+        data_kwargs_val = {'transformForAll': self.transformForAll_val,
+                           'transformForImage': self.transformForImage_val,
+                           'transformForSeg': self.transformForSeg_val,
+                           'rootDir': self.rootDir,
+                           'segDistinguishInstance': True}
+
+        self.trainset = get_segmentation_dataset(
+            self.dataset, split='train', **data_kwargs)
+        self.trainSetLen = len(self.trainset)
+
+        train_sampler = make_data_sampler(
+            self.trainset, shuffle=True, distributed=self.distributed)
+        train_batch_sampler = make_batch_data_sampler(
+            train_sampler, self.batch_size, self.max_iters)
+        self.train_loader = data.DataLoader(dataset=self.trainset,
+                                            batch_sampler=train_batch_sampler,
+                                            num_workers=self.workers,
+                                            pin_memory=True)
+
+        if not self.skip_val:
+            self.valset = get_segmentation_dataset(
+                self.dataset, split='val', **data_kwargs_val)
+            val_sampler = make_data_sampler(self.valset, False, self.distributed)
+            val_batch_sampler = make_batch_data_sampler(
+                val_sampler, self.batch_size)
+            self.val_loader = data.DataLoader(dataset=self.valset,
+                                              batch_sampler=val_batch_sampler,
+                                              num_workers=self.workers,
+                                              pin_memory=True)
+
+        self.model = get_segmentation_model(self.modelName)
+        # optimizer
+        self.optimizer = torch.optim.SGD(self.model.parameters(),
+                                         lr=self.lr,
+                                         momentum=self.momentum,
+                                         weight_decay=self.weight_decay)
+
+        # lr scheduling
+        self.lr_scheduler = WarmupPolyLR(self.optimizer,
+                                         max_iters=self.max_iters,
+                                         power=0.9,
+                                         warmup_factor=self.warmup_factor,
+                                         warmup_iters=self.warmup_iters,
+                                         warmup_method=self.warmup_method)
