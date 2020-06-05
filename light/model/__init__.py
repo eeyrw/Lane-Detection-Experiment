@@ -8,6 +8,7 @@ from .igcv3_seg import *
 from .efficientnet_seg import *
 from .erfnet_seg import *
 from .erfnet_lstm_seg import *
+from .lanenet_erfnet_seg import *
 
 
 def get_segmentation_model(model, **kwargs):

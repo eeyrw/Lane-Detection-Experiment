@@ -82,8 +82,8 @@ class ExperimentHelper(object):
 
         save_per_iters = self.args.save_epoch * self.args.iters_per_epoch
 
-        self.logger = setup_logger(self.args.model, self.args.log_dir, 0, filename='{}_{}_log_{}-{}.txt'.format(
-            self.args.model, self.args.dataset, self.experimentName, self.experimentStartTime))
+        self.logger = setup_logger(self.args.modelName, self.args.log_dir, 0, filename='{}_{}_log_{}-{}.txt'.format(
+            self.args.modelName, self.args.dataset, self.experimentName, self.experimentStartTime))
         self.writer = SummaryWriter(comment='-%s-%s' %
                                     (self.experimentName, self.experimentStartTime))
         self.logger.info(self.args)
@@ -100,7 +100,7 @@ class ExperimentHelper(object):
         return eta_string
 
     def isTimeToLog(self):
-        return self.iteration % self.args.log_ter == 0
+        return self.iteration % self.args.log_iter == 0
 
     def isTimeToCheckTrainResult(self):
         return self.iteration % self.args.train_log_iter == 0 or self.iteration == 1
@@ -152,3 +152,4 @@ class ExperimentHelper(object):
                       * 0.7, cmap=plt.cm.rainbow, vmin=0, vmax=1)
         self.writer.add_figure(tag, fig2,
                                global_step=step, close=True, walltime=None)
+        self.writer.flush()

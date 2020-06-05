@@ -35,6 +35,8 @@ class Trainer(object):
         self.args = self.exprHelper.args
         assert self.args.modelName == 'lanenet_erfnet'
         self.model = self.args.model
+        self.optimizer = self.args.optimizer
+        self.lr_scheduler = self.args.lr_scheduler
 
         self.best_pred = 0.0
         self.best_val_loss = 1000000
@@ -95,11 +97,11 @@ class Trainer(object):
                 val_loss = self.validation(self.exprHelper.writer, iteration)
                 self.exprHelper.writer.add_scalar(
                     'Loss/val', val_loss, iteration)
-                self.model.train()
+                self.args.model.train()
 
             if self.exprHelper.isTimeToCheckTrainResult():
                 self.exprHelper.visualizeImageAndLabel('TrainSamples', iteration, images[0].cpu(
-                ), targets[0].cpu(), torch.sigmoid(outputs[0]).cpu())
+                ), targets[0].unsqueeze(0).cpu(), torch.sigmoid(binary_seg[0][0].unsqueeze(0)).cpu())
         self.exprHelper.trainFinish(self.model)
 
     def validation(self, writer, iteration):
@@ -139,7 +141,7 @@ class Trainer(object):
 if __name__ == '__main__':
 
     print(os.getcwd())
-    trainer = Trainer('ExperimentConfig')
+    trainer = Trainer('ExperimentConfigERFNetLaneNet')
     trainer.train()
     torch.cuda.empty_cache()
     writer.close()

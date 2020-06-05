@@ -35,6 +35,7 @@ class CULaneDataset(Dataset):
                  transformForImage=None,
                  resizeAndCropTo=(-1, -1),
                  segDistinguishInstance=False,
+                 removeLabelChannelDim=False,
                  ):
         self.rootDir = rootDir
         self.transformForAll = transformForAll
@@ -48,6 +49,7 @@ class CULaneDataset(Dataset):
         self.wantedWidth = resizeAndCropTo[0]
         self.wantedHeight = resizeAndCropTo[1]
         self.segDistinguishInstance = segDistinguishInstance
+        self.removeLabelChannelDim = removeLabelChannelDim
 
         if self.wantedWidth > 0 and self.wantedHeight > 0:
             self.doResizeAndCrop = True
@@ -171,10 +173,17 @@ class CULaneDataset(Dataset):
 
         if not self.segDistinguishInstance:
             rawSegImage = np.clip(rawSegImage, 0, 1)
-            segImage = torch.from_numpy(rawSegImage).unsqueeze(0).float()
+            if self.removeLabelChannelDim:
+                segImage = torch.from_numpy(rawSegImage).float()
+            else:
+                segImage = torch.from_numpy(rawSegImage).unsqueeze(0).float()
         else:
-            segImage = torch.from_numpy(
-                np.array(rawSegImage)).unsqueeze(0)
+            if self.removeLabelChannelDim:
+                segImage = torch.from_numpy(
+                    np.array(rawSegImage))
+            else:
+                segImage = torch.from_numpy(
+                    np.array(rawSegImage)).unsqueeze(0)
 
         if requireRawImage:
             return imageRgb, segImage, imageFile
