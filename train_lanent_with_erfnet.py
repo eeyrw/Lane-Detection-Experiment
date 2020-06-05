@@ -34,6 +34,7 @@ class Trainer(object):
         self.device = self.exprHelper.device
         self.args = self.exprHelper.args
         assert self.args.modelName == 'lanenet_erfnet'
+        self.model = self.args.model
 
         self.best_pred = 0.0
         self.best_val_loss = 1000000
@@ -85,11 +86,10 @@ class Trainer(object):
                     'Loss/trainReg', reg_loss, iteration)
 
                 self.exprHelper.writer.add_scalar('HyperParameter/learning_rate',
-                                                  self.optimizer.param_groups[0]['lr'], iteration)
+                                                  self.args.optimizer.param_groups[0]['lr'], iteration)
 
             if self.exprHelper.isTimeToSaveCheckPoint():
-                self.exprHelper.save_checkpoint(
-                    self.model, args, is_best=False)
+                self.exprHelper.save_checkpoint(self.model, is_best=False)
 
             if self.exprHelper.isTimeToValidate():
                 val_loss = self.validation(self.exprHelper.writer, iteration)
@@ -109,13 +109,13 @@ class Trainer(object):
         torch.cuda.empty_cache()  # TODO check if it helps
         model.eval()
         lossList = []
-        for i, (image, target) in enumerate(self.val_loader):
+        for i, (image, target) in enumerate(self.args.val_loader):
             image = image.to(self.device)
             target = target.to(self.device)
 
             with torch.no_grad():
                 output = model(image)
-                resultDict = self.model(images, targets)
+                resultDict = self.model(image, target)
                 embedding = resultDict['embedding']
                 binary_seg = resultDict['binary_seg']
                 loss = resultDict['loss']
@@ -124,7 +124,7 @@ class Trainer(object):
                 i + 1, loss))
 
             if i == 0:
-                self.visualizeImageAndLabel(writer, 'ValidationSamples', iteration, image[0].cpu(
+                self.exprHelper.visualizeImageAndLabel(writer, 'ValidationSamples', iteration, image[0].cpu(
                 ), target[0].cpu(), torch.sigmoid(output[0]).cpu())
 
         new_val_loss = torch.Tensor(lossList).mean()
